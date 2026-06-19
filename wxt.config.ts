@@ -11,7 +11,10 @@ export default defineConfig({
     manifest: {
         name: "Navi",
         description: "AI-powered browser copilot sidebar",
-        permissions: ["sidePanel"],
+        permissions: ["sidePanel", "storage", "scripting", "activeTab", "tabs"],
+        // Needed so the side panel can call user-configured OpenAI-compatible
+        // endpoints cross-origin without being blocked by CORS.
+        host_permissions: ["http://*/*", "https://*/*"],
         action: {},
     },
     vite: () => ({
