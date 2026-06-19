@@ -5,7 +5,7 @@
 Navi is a browser extension that adds a persistent side panel to your browser. It acts as an
 AI copilot that can chat with you, read and understand the current page, and take autonomous
 actions on your behalf — forming a full agent loop. Think of it as a smart assistant that lives
-in your browser and can actually *do* things, not just talk.
+in your browser and can actually _do_ things, not just talk.
 
 Navi is designed to support multiple LLM providers:
 
@@ -50,24 +50,24 @@ pnpm run dev:firefox
 The dev server does **not** auto-launch a browser. Load the extension manually from the build
 output (`.output/`):
 
-- **Chrome** — open `chrome://extensions`, enable *Developer mode*, click *Load unpacked*, and
+- **Chrome** — open `chrome://extensions`, enable _Developer mode_, click _Load unpacked_, and
   select `.output/chrome-mv3`.
-- **Firefox** — open `about:debugging` → *This Firefox* → *Load Temporary Add-on*, and select the
+- **Firefox** — open `about:debugging` → _This Firefox_ → _Load Temporary Add-on_, and select the
   manifest in `.output/firefox-mv2`.
 
 Once loaded, click the Navi toolbar icon to open the side panel.
 
 ## Scripts
 
-| Script                  | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| `pnpm run dev`          | Start the WXT dev server (Chrome).           |
-| `pnpm run dev:firefox`  | Start the WXT dev server (Firefox).          |
-| `pnpm run build`        | Build the extension for production (Chrome). |
-| `pnpm run build:firefox`| Build the extension for production (Firefox).|
-| `pnpm run zip`          | Build and package a distributable zip.       |
-| `pnpm run zip:firefox`  | Build and package a Firefox zip.             |
-| `pnpm run compile`      | Type-check the project (`tsc --noEmit`).     |
+| Script                   | Description                                   |
+| ------------------------ | --------------------------------------------- |
+| `pnpm run dev`           | Start the WXT dev server (Chrome).            |
+| `pnpm run dev:firefox`   | Start the WXT dev server (Firefox).           |
+| `pnpm run build`         | Build the extension for production (Chrome).  |
+| `pnpm run build:firefox` | Build the extension for production (Firefox). |
+| `pnpm run zip`           | Build and package a distributable zip.        |
+| `pnpm run zip:firefox`   | Build and package a Firefox zip.              |
+| `pnpm run compile`       | Type-check the project (`tsc --noEmit`).      |
 
 ## Project structure
 
