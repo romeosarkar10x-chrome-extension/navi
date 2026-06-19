@@ -1,0 +1,8 @@
+/.claude
+
+/node_modules
+/output
+/.wxt
+
+/pnpm-lock.yaml
+/pnpm-workspace.yaml
