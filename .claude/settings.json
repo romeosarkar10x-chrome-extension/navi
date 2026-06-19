@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -c commit.gpgsign=false -c user.name=Claude -c user.email=noreply@anthropic.com commit *)",
+      "Bash(git -c user.name=Claude -c user.email=noreply@anthropic.com commit -q -m ' *)",
+      "Bash(git commit *)",
+      "Bash(git add *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git config *)",
+      "Bash(echo \"local name: [$\\(git config --local user.name\\)]\")",
+      "Bash(echo \"local email: [$\\(git config --local user.email\\)]\")",
+      "Bash(echo \"name: $\\(git config user.name\\)\")",
+      "Bash(echo \"email: $\\(git config user.email\\)\")",
+      "Bash(pnpm -v)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm remove *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm run *)",
+      "Bash(pnpm dlx *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \" *)",
+      "Bash(ls \"C:/Users/romeo/.claude/projects/d--github-romeosarkar10x-chrome-extension-navi/memory/\")",
+      "Read(//c/Users/romeo/.claude/projects/d--github-romeosarkar10x-chrome-extension-navi/memory/**)"
+    ]
+  },
+  "additionalDirectories": [
+    "d:\\github\\romeosarkar10x_chrome_extension",
+    "d:\\github\\romeosarkar10x_chrome_extension\\navi\\.claude"
+  ]
+}
