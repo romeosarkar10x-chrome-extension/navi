@@ -22,7 +22,11 @@
       "Bash(node -e ' *)",
       "Bash(node -e \" *)",
       "Bash(ls \"C:/Users/romeo/.claude/projects/d--github-romeosarkar10x-chrome-extension-navi/memory/\")",
-      "Read(//c/Users/romeo/.claude/projects/d--github-romeosarkar10x-chrome-extension-navi/memory/**)"
+      "Read(//c/Users/romeo/.claude/projects/d--github-romeosarkar10x-chrome-extension-navi/memory/**)",
+      "Bash(cd \"d:/github/romeosarkar10x_chrome_extension/navi\" && rm .claude/settings.local.json && echo \"deleted\")"
+    ],
+    "additionalDirectories": [
+      "d:\\github\\romeosarkar10x_chrome_extension\\navi\\.claude"
     ]
   },
   "additionalDirectories": [
