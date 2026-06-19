@@ -7,6 +7,7 @@
 - Author Claude's own commits as Claude, not the user. **Override the identity per-commit — never change the repo's git config**, since that would also reauthor the user's commits.
   - Use the `-c` flags on each commit so both author and committer are set for that one command only:
     ```
-    git -c user.name="Claude" -c user.email="noreply@anthropic.com" commit -m "..."
+    git -c commit.gpgsign=false -c user.name="Claude" -c user.email="noreply@anthropic.com" commit -m "..."
     ```
   - Do NOT run `git config user.name`/`user.email` (local or global) to set this.
+- **Disable GPG signing on Claude-authored commits** with the per-command flag `-c commit.gpgsign=false` (shown above). The repo signs with the user's GPG key via an interactive passphrase prompt, which can't be answered non-interactively, and Claude's commits shouldn't be signed with the user's key anyway. Set this per-command only — never change the repo's `commit.gpgsign` config.
