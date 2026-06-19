@@ -13,7 +13,35 @@ import {
     StreamingIndicator,
     type Step,
 } from "@/components";
+import { cn } from "@/lib/cn";
+import type { ActiveTab, ElementAttachment } from "@/lib/page-bridge";
+import type { ExecutableAction } from "@/lib/agent";
 import type { ChatTurn } from "./types";
+
+const CHIP_BTN =
+    "inline-flex items-center gap-[5px] rounded-full py-[3px] px-[8px] font-ui text-2xs cursor-pointer border " +
+    "transition duration-[120ms] ease-[var(--ease-out)]";
+
+function hostOf(url: string): string {
+    try {
+        return new URL(url).hostname || url;
+    } catch {
+        return url || "current page";
+    }
+}
+
+function describeAction(a: ExecutableAction): string {
+    switch (a.action) {
+        case "click":
+            return `Click element #${a.ref}`;
+        case "fill":
+            return `Type “${a.value}” into #${a.ref}`;
+        case "select":
+            return `Select “${a.value}” in #${a.ref}`;
+        case "scroll":
+            return a.ref == null ? "Scroll the page" : `Scroll to #${a.ref}`;
+    }
+}
 
 export interface ChatViewProps {
     messages: ChatTurn[];
@@ -23,9 +51,37 @@ export interface ChatViewProps {
     model: string;
     onOpenModel: () => void;
     busy: boolean;
+    onStop: () => void;
+    activeTab: ActiveTab | null;
+    attachPage: boolean;
+    onToggleAttach: (on: boolean) => void;
+    attachments: ElementAttachment[];
+    onRemoveAttachment: (ref: number) => void;
+    picking: boolean;
+    onTogglePicker: () => void;
+    pendingApproval: ExecutableAction | null;
+    onApprove: (approved: boolean) => void;
 }
 
-export function ChatView({ messages, draft, setDraft, onSend, model, onOpenModel, busy }: ChatViewProps) {
+export function ChatView({
+    messages,
+    draft,
+    setDraft,
+    onSend,
+    model,
+    onOpenModel,
+    busy,
+    onStop,
+    activeTab,
+    attachPage,
+    onToggleAttach,
+    attachments,
+    onRemoveAttachment,
+    picking,
+    onTogglePicker,
+    pendingApproval,
+    onApprove,
+}: ChatViewProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const el = scrollRef.current;
@@ -57,32 +113,114 @@ export function ChatView({ messages, draft, setDraft, onSend, model, onOpenModel
                         </ChatMessage>
                     ),
                 )}
-                {busy && (
+                {busy && !pendingApproval && (
                     <div className="py-[2px] px-1">
-                        <StreamingIndicator label="Navi is thinking…" />
+                        <StreamingIndicator label="Navi is working…" />
                     </div>
                 )}
             </div>
 
             <div className="flex-none border-t border-line bg-surface-base pt-[10px] px-3 pb-3 flex flex-col gap-[9px]">
-                <div className="flex gap-[6px] flex-wrap">
-                    <ContextPill icon="globe">linkedin.com/jobs</ContextPill>
-                    <ContextPill
-                        icon="scan-text"
-                        onRemove={() => {}}>
-                        Selected text
-                    </ContextPill>
+                {pendingApproval && (
+                    <div className="flex items-center gap-2 rounded-md border border-accent-line bg-surface-agent px-[10px] py-2">
+                        <span className="flex-none inline-flex text-accent-text">
+                            <Icon
+                                name="mouse-pointer-click"
+                                size={14}
+                            />
+                        </span>
+                        <span className="flex-1 min-w-0 text-sm text-strong truncate">
+                            {describeAction(pendingApproval)}
+                        </span>
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            icon="play"
+                            onClick={() => onApprove(true)}>
+                            Run
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onApprove(false)}>
+                            Skip
+                        </Button>
+                    </div>
+                )}
+
+                <div className="flex gap-[6px] flex-wrap items-center">
+                    {attachPage && activeTab ? (
+                        <ContextPill
+                            icon="globe"
+                            onRemove={() => onToggleAttach(false)}>
+                            {hostOf(activeTab.url)}
+                        </ContextPill>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => onToggleAttach(true)}
+                            className={cn(
+                                CHIP_BTN,
+                                "bg-surface-raised border-line text-muted hover:text-strong hover:border-line-strong",
+                            )}>
+                            <Icon
+                                name="plus"
+                                size={11}
+                            />
+                            Attach page
+                        </button>
+                    )}
+                    {attachments.map(a => (
+                        <ContextPill
+                            key={a.ref}
+                            icon="scan-text"
+                            onRemove={() => onRemoveAttachment(a.ref)}>
+                            {a.descriptor}
+                        </ContextPill>
+                    ))}
+                    <button
+                        type="button"
+                        onClick={onTogglePicker}
+                        className={cn(
+                            CHIP_BTN,
+                            picking
+                                ? "bg-accent-soft border-accent-line text-accent-text"
+                                : "bg-surface-raised border-line text-muted hover:text-strong hover:border-line-strong",
+                        )}>
+                        <Icon
+                            name="mouse-pointer-click"
+                            size={11}
+                        />
+                        {picking ? "Picking… (Esc)" : "Inspect element"}
+                    </button>
+                    {busy && (
+                        <button
+                            type="button"
+                            onClick={onStop}
+                            className={cn(CHIP_BTN, "ml-auto border-line text-error hover:border-line-strong")}>
+                            <Icon
+                                name="square"
+                                size={11}
+                            />
+                            Stop
+                        </button>
+                    )}
                 </div>
+
                 <QuickActions
                     actions={[
                         { icon: "scan-text", label: "Summarize page", onClick: () => onSend("Summarize this page") },
                         {
                             icon: "table",
                             label: "Extract data",
-                            onClick: () => onSend("Extract the job listings as a table"),
+                            onClick: () => onSend("Extract the main data on this page as a table"),
                         },
-                        { icon: "camera", label: "Screenshot & analyze" },
-                        { icon: "text-cursor-input", label: "Fill form" },
+                        {
+                            icon: "mouse-pointer-click",
+                            label: "What can I click?",
+                            onClick: () =>
+                                onSend("What are the main things I can click or interact with on this page?"),
+                        },
                     ]}
                 />
                 <PromptInput
@@ -91,6 +229,7 @@ export function ChatView({ messages, draft, setDraft, onSend, model, onOpenModel
                     onSend={() => onSend(draft)}
                     model={model}
                     onModelClick={onOpenModel}
+                    disabled={busy}
                 />
             </div>
         </div>

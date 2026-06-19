@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { APIKeyInput, Button, Icon, Select, Slider, StatusDot, Switch } from "@/components";
+import { APIKeyInput, Button, Icon, Input, Select, Slider, Switch } from "@/components";
+import { matchPreset, PRESETS, type ProviderConfig, type ProviderPreset } from "@/lib/providers";
+import type { AgentSettings } from "@/lib/storage";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
     return (
@@ -22,14 +24,34 @@ function Row({ label, hint, children }: { label: ReactNode; hint?: ReactNode; ch
     );
 }
 
-export function SettingsView({ onBack }: { onBack: () => void }) {
-    const [provider, setProvider] = useState("cloud");
-    const [autoExec, setAutoExec] = useState(false);
-    const [maxSteps, setMaxSteps] = useState(10);
+export interface SettingsViewProps {
+    config: ProviderConfig;
+    onConfigChange: (config: ProviderConfig) => void;
+    agentSettings: AgentSettings;
+    onAgentSettingsChange: (settings: AgentSettings) => void;
+    onBack: () => void;
+}
+
+const CUSTOM = "custom";
+
+export function SettingsView({
+    config,
+    onConfigChange,
+    agentSettings,
+    onAgentSettingsChange,
+    onBack,
+}: SettingsViewProps) {
     const [theme, setTheme] = useState("system");
     const [speed, setSpeed] = useState("Normal");
     const [position, setPosition] = useState("Right");
     const [history, setHistory] = useState(true);
+
+    const activePreset = matchPreset(config);
+
+    function selectPreset(id: string) {
+        const preset = PRESETS.find(p => p.id === id);
+        if (preset) onConfigChange({ ...config, baseURL: preset.baseURL, model: preset.model });
+    }
 
     return (
         <div className="flex-1 min-h-0 flex flex-col pt-4 px-4 pb-5 overflow-y-auto navi-scroll">
@@ -46,41 +68,41 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
             <h2 className="font-display text-xl font-semibold text-strong mb-[18px]">Settings</h2>
 
             <Section title="Provider">
-                <Row label="Source">
+                <Row label="Preset">
                     <Select
-                        value={provider}
-                        onChange={e => setProvider(e.target.value)}
+                        value={activePreset?.id ?? CUSTOM}
+                        onChange={e => selectPreset(e.target.value)}
                         size="sm"
                         options={[
-                            { value: "cloud", label: "Cloud · Claude" },
-                            { value: "local", label: "Local · LM Studio" },
+                            ...PRESETS.map(p => ({ value: p.id, label: p.label })),
+                            { value: CUSTOM, label: "Custom" },
                         ]}
                     />
                 </Row>
-                {provider === "cloud" ? (
-                    <Row label="API key">
-                        <APIKeyInput
-                            size="sm"
-                            value="sk-ant-api03-9f2c"
-                            onChange={() => {}}
-                        />
-                    </Row>
-                ) : (
-                    <Row label="Status">
-                        <StatusDot
-                            tone="success"
-                            pulse>
-                            localhost:1234
-                        </StatusDot>
-                    </Row>
-                )}
-                <Row label="Model">
-                    <Select
+                <Row label="Endpoint">
+                    <Input
                         size="sm"
-                        options={[
-                            { value: "s4", label: "Claude Sonnet 4" },
-                            { value: "o4", label: "Claude Opus 4" },
-                        ]}
+                        className="w-[180px]"
+                        value={config.baseURL}
+                        onChange={e => onConfigChange({ ...config, baseURL: e.target.value })}
+                    />
+                </Row>
+                <Row label="Model">
+                    <Input
+                        size="sm"
+                        className="w-[180px]"
+                        value={config.model}
+                        onChange={e => onConfigChange({ ...config, model: e.target.value })}
+                    />
+                </Row>
+                <Row
+                    label="API key"
+                    hint={activePreset && !activePreset.requiresKey ? "Not required for this endpoint" : undefined}>
+                    <APIKeyInput
+                        size="sm"
+                        className="w-[180px]"
+                        value={config.apiKey}
+                        onChange={e => onConfigChange({ ...config, apiKey: e.target.value })}
                     />
                 </Row>
             </Section>
@@ -90,19 +112,19 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
                     label="Auto-execute actions"
                     hint="Run without asking each time">
                     <Switch
-                        checked={autoExec}
-                        onChange={setAutoExec}
+                        checked={agentSettings.autoExecute}
+                        onChange={v => onAgentSettingsChange({ ...agentSettings, autoExecute: v })}
                     />
                 </Row>
                 <Row
                     label="Max autonomous steps"
-                    hint={`${maxSteps} before pausing`}>
+                    hint={`${agentSettings.maxSteps} before pausing`}>
                     <div className="w-[120px]">
                         <Slider
-                            value={maxSteps}
+                            value={agentSettings.maxSteps}
                             min={1}
                             max={50}
-                            onChange={setMaxSteps}
+                            onChange={v => onAgentSettingsChange({ ...agentSettings, maxSteps: v })}
                         />
                     </div>
                 </Row>
@@ -165,25 +187,13 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     );
 }
 
-interface ModelOption {
-    id: string;
-    sub: string;
-    icon: "sparkles" | "cpu";
-}
-
-const MODELS: ModelOption[] = [
-    { id: "Claude Sonnet 4", sub: "Anthropic · fast, balanced", icon: "sparkles" },
-    { id: "Claude Opus 4", sub: "Anthropic · deepest reasoning", icon: "sparkles" },
-    { id: "Mistral 7B", sub: "Local · localhost:1234", icon: "cpu" },
-];
-
 export interface ModelSheetProps {
-    current: string;
-    onPick: (label: string) => void;
+    currentModel: string;
+    onPick: (preset: ProviderPreset) => void;
     onClose: () => void;
 }
 
-export function ModelSheet({ current, onPick, onClose }: ModelSheetProps) {
+export function ModelSheet({ currentModel, onPick, onClose }: ModelSheetProps) {
     return (
         <div
             onClick={onClose}
@@ -193,33 +203,31 @@ export function ModelSheet({ current, onPick, onClose }: ModelSheetProps) {
                 className="w-full bg-surface-overlay border-t border-line-strong rounded-t-xl pt-2 px-3 pb-4 shadow-[var(--shadow-pop)] animate-sheet-up">
                 <div className="w-[34px] h-1 rounded-[2px] bg-line-strong mx-auto mt-[6px] mb-3" />
                 <div className="text-sm font-semibold text-strong px-1 pb-2">Switch model</div>
-                {MODELS.map(m => {
-                    const on = m.id === current;
+                {PRESETS.map(preset => {
+                    const on = preset.model === currentModel;
                     return (
                         <button
                             type="button"
-                            key={m.id}
-                            onClick={() => onPick(m.id)}
+                            key={preset.id}
+                            onClick={() => onPick(preset)}
                             className={`flex items-center gap-[11px] w-full p-[10px] border-none rounded-md cursor-pointer text-left text-inherit transition duration-[120ms] ease-[var(--ease-out)] ${
                                 on ? "bg-accent-soft" : "bg-transparent hover:bg-control"
                             }`}>
                             <span className="w-[30px] h-[30px] flex-none rounded-sm bg-surface-raised flex items-center justify-center text-accent-text">
                                 <Icon
-                                    name={m.icon}
+                                    name={preset.icon}
                                     size={15}
                                 />
                             </span>
                             <div className="flex-1 min-w-0">
-                                <div className="text-base font-medium text-strong">{m.id}</div>
-                                <div className="text-2xs text-muted font-mono mt-[1px]">{m.sub}</div>
+                                <div className="text-base font-medium text-strong">{preset.label}</div>
+                                <div className="text-2xs text-muted font-mono mt-[1px]">{preset.sub}</div>
                             </div>
-                            {on ? (
+                            {on && (
                                 <Icon
                                     name="check"
                                     size={15}
                                 />
-                            ) : (
-                                <StatusDot tone="success" />
                             )}
                         </button>
                     );

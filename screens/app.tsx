@@ -1,35 +1,86 @@
-import { useState, type ReactNode } from "react";
-import { Button, Icon, type IconName } from "@/components";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Button, Icon, type ActionDetail, type ActionStatus, type ActionType, type IconName } from "@/components";
 import { cn } from "@/lib/cn";
+import { DEFAULT_CONFIG, type ProviderConfig } from "@/lib/providers";
+import {
+    DEFAULT_AGENT_SETTINGS,
+    loadAgentSettings,
+    loadConfig,
+    saveAgentSettings,
+    saveConfig,
+    type AgentSettings,
+} from "@/lib/storage";
+import type { ChatMessage } from "@/lib/chat-client";
+import { runAgent, type ActionPhase, type AgentCallbacks, type ExecutableAction } from "@/lib/agent";
+import {
+    capturePage,
+    getActiveTab,
+    runAction,
+    type ActionResult,
+    type ActiveTab,
+    type ElementAttachment,
+    type PageSnapshot,
+} from "@/lib/page-bridge";
+import { startPicker, stopPicker } from "@/lib/element-picker";
 import { TopBar } from "./shell";
 import { WelcomeView, ConnectView } from "./welcome";
 import { ChatView, TaskView } from "./chat";
 import { SettingsView, ModelSheet } from "./settings";
-import type { ChatTurn, ModelID, Provider, ViewKey } from "./types";
+import type { ChatTurn, ViewKey } from "./types";
 
 const GREETING: ChatTurn[] = [
     {
         role: "assistant",
-        meta: "claude-sonnet-4",
+        meta: "navi",
         body: (
             <span>
-                Hey! I can see this jobs page. Ask me to summarize it, pull the listings into a table, or apply to
-                matching roles — I'll show each step before running.
+                Hey! I can see the current tab. Ask me to summarize it, pull data into a table, or act on it — click a
+                button, fill a form. Use <b>Inspect element</b> to attach a specific element to talk about.
             </span>
         ),
     },
 ];
 
-const MODEL_LABELS: Record<ModelID, string> = {
-    "claude-sonnet-4": "Claude Sonnet 4",
-    "claude-opus-4": "Claude Opus 4",
-    "mistral-7b": "Mistral 7B",
+function actionLabel(action: ExecutableAction): string {
+    switch (action.action) {
+        case "click":
+            return `Click #${action.ref}`;
+        case "fill":
+            return `Type into #${action.ref}`;
+        case "select":
+            return `Select in #${action.ref}`;
+        case "scroll":
+            return action.ref == null ? "Scroll page" : `Scroll to #${action.ref}`;
+    }
+}
+
+const ACTION_TYPE: Record<ExecutableAction["action"], ActionType> = {
+    click: "click",
+    fill: "fill",
+    select: "fill",
+    scroll: "navigate",
 };
 
-function labelToModel(label: string): ModelID {
-    if (label === "Claude Opus 4") return "claude-opus-4";
-    if (label === "Mistral 7B") return "mistral-7b";
-    return "claude-sonnet-4";
+const ACTION_STATUS: Record<ActionPhase, ActionStatus> = {
+    pending: "pending",
+    running: "running",
+    success: "success",
+    failed: "failed",
+};
+
+function actionCard(action: ExecutableAction, phase: ActionPhase, id: string, result?: ActionResult): ChatTurn {
+    const detail: ActionDetail[] = [];
+    if (action.action !== "scroll") detail.push({ k: "ref", v: String(action.ref) });
+    if (action.action === "fill" || action.action === "select") detail.push({ k: "value", v: action.value });
+    if (result?.error && result.error !== "skipped") detail.push({ k: "error", v: result.error });
+    return {
+        kind: "action",
+        id,
+        type: ACTION_TYPE[action.action],
+        label: actionLabel(action),
+        status: ACTION_STATUS[phase],
+        detail,
+    };
 }
 
 function EmptyView({ kind, onBack }: { kind: "history" | "recipes"; onBack: () => void }) {
@@ -70,89 +121,174 @@ function EmptyView({ kind, onBack }: { kind: "history" | "recipes"; onBack: () =
 
 export function App() {
     const [view, setView] = useState<ViewKey>("welcome");
-    const [provider, setProvider] = useState<Provider>("cloud");
-    const [model, setModel] = useState<ModelID>("claude-sonnet-4");
+    const [config, setConfig] = useState<ProviderConfig>(DEFAULT_CONFIG);
+    const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_AGENT_SETTINGS);
     const [sheet, setSheet] = useState(false);
     const [messages, setMessages] = useState<ChatTurn[]>(GREETING);
     const [draft, setDraft] = useState("");
     const [busy, setBusy] = useState(false);
+    const [activeTab, setActiveTab] = useState<ActiveTab | null>(null);
+    const [attachPage, setAttachPage] = useState(true);
+    const [attachments, setAttachments] = useState<ElementAttachment[]>([]);
+    const [picking, setPicking] = useState(false);
+    const [pendingApproval, setPendingApproval] = useState<ExecutableAction | null>(null);
 
-    function send(text: string) {
+    const abortRef = useRef<AbortController | null>(null);
+    const approvalRef = useRef<((approved: boolean) => void) | null>(null);
+    const pickerDisposeRef = useRef<(() => void) | null>(null);
+
+    useEffect(() => {
+        loadConfig().then(setConfig);
+        loadAgentSettings().then(setAgentSettings);
+        return () => pickerDisposeRef.current?.();
+    }, []);
+
+    useEffect(() => {
+        if (view === "chat")
+            getActiveTab()
+                .then(setActiveTab)
+                .catch(() => {});
+    }, [view]);
+
+    function persistConfig(next: ProviderConfig) {
+        setConfig(next);
+        void saveConfig(next);
+    }
+
+    function persistAgentSettings(next: AgentSettings) {
+        setAgentSettings(next);
+        void saveAgentSettings(next);
+    }
+
+    async function togglePicker() {
+        const tab = activeTab ?? (await getActiveTab());
+        if (!tab) return;
+        if (picking) {
+            pickerDisposeRef.current?.();
+            pickerDisposeRef.current = null;
+            await stopPicker(tab.id);
+            setPicking(false);
+        } else {
+            pickerDisposeRef.current = startPicker(tab.id, a => setAttachments(prev => [...prev, a]));
+            setPicking(true);
+        }
+    }
+
+    function requestApproval(action: ExecutableAction): Promise<boolean> {
+        setPendingApproval(action);
+        return new Promise<boolean>(resolve => {
+            approvalRef.current = approved => {
+                approvalRef.current = null;
+                setPendingApproval(null);
+                resolve(approved);
+            };
+        });
+    }
+
+    function handleApprove(approved: boolean) {
+        approvalRef.current?.(approved);
+    }
+
+    function handleStop() {
+        abortRef.current?.abort();
+        approvalRef.current?.(false);
+        setBusy(false);
+    }
+
+    async function send(text: string) {
         const t = (text || "").trim();
-        if (!t) return;
+        if (!t || busy) return;
         setDraft("");
-        setMessages(m => [...m, { role: "user", body: t }]);
+
+        const history: ChatMessage[] = messages
+            .filter(m => m.kind !== "action" && (m.role === "user" || m.role === "assistant"))
+            .map(m => ({
+                role: m.role as "user" | "assistant",
+                content: m.text ?? (typeof m.body === "string" ? m.body : ""),
+            }))
+            .filter(m => m.content.length > 0);
+
+        setMessages(m => [...m, { role: "user", body: t, text: t }]);
         setBusy(true);
-        setTimeout(() => {
-            setBusy(false);
-            if (/apply/i.test(t)) {
+
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        const tab = activeTab ?? (await getActiveTab());
+        if (tab && !activeTab) setActiveTab(tab);
+
+        let snapshot: PageSnapshot | null = null;
+        if (attachPage && tab) {
+            try {
+                snapshot = await capturePage(tab.id);
+            } catch (err) {
                 setMessages(m => [
                     ...m,
                     {
                         role: "assistant",
-                        meta: "claude-sonnet-4",
-                        body: (
-                            <span>
-                                I found <strong>12 matching roles</strong>. I'll apply to each, pausing for review
-                                before any submit. Starting now.
-                            </span>
-                        ),
-                    },
-                ]);
-                setTimeout(() => setView("task"), 600);
-            } else if (/table|extract/i.test(t)) {
-                setMessages(m => [
-                    ...m,
-                    {
-                        kind: "action",
-                        type: "scrape",
-                        label: (
-                            <span>
-                                Scraped <b>12 listings</b>
-                            </span>
-                        ),
-                        status: "success",
-                        detail: [
-                            { k: "fields", v: "title, company, location, salary" },
-                            { k: "rows", v: "12" },
-                        ],
-                        open: true,
-                    },
-                    {
-                        role: "assistant",
-                        meta: "claude-sonnet-4",
-                        body: (
-                            <span>
-                                Extracted 12 listings. Top result: <strong>Senior SWE · Acme · $180–210k</strong>. Want
-                                this as CSV?
-                            </span>
-                        ),
-                    },
-                ]);
-            } else {
-                setMessages(m => [
-                    ...m,
-                    {
-                        role: "assistant",
-                        meta: "claude-sonnet-4",
-                        body: (
-                            <span>
-                                This is a <strong>job search results</strong> page with 1,284 listings. The top roles
-                                are senior backend and full-stack positions in the Bay Area, most posted this week.
-                            </span>
-                        ),
+                        meta: "note",
+                        body: `⚠️ ${err instanceof Error ? err.message : "Couldn't read the page"}`,
                     },
                 ]);
             }
-        }, 1500);
+        }
+
+        let cardCounter = 0;
+        let currentCardId = "";
+        const callbacks: AgentCallbacks = {
+            onAction: (action, phase, result) => {
+                if (phase === "pending") currentCardId = `act-${Date.now()}-${cardCounter++}`;
+                const id = currentCardId;
+                const card = actionCard(action, phase, id, result);
+                setMessages(m => {
+                    const idx = m.findIndex(x => x.id === id);
+                    if (idx < 0) return [...m, card];
+                    const copy = [...m];
+                    copy[idx] = card;
+                    return copy;
+                });
+            },
+            onAnswer: txt => {
+                setMessages(m => [...m, { role: "assistant", meta: config.model, body: txt, text: txt }]);
+            },
+        };
+
+        try {
+            await runAgent({
+                config,
+                userText: t,
+                snapshot,
+                attachments,
+                history,
+                callbacks,
+                maxSteps: agentSettings.maxSteps,
+                autoExecute: agentSettings.autoExecute,
+                requestApproval,
+                runAction: action =>
+                    tab ? runAction(tab.id, action) : Promise.resolve({ ok: false, error: "No accessible tab" }),
+                recapture: async () => {
+                    if (!attachPage || !tab) return snapshot;
+                    try {
+                        return await capturePage(tab.id);
+                    } catch {
+                        return null;
+                    }
+                },
+                signal: controller.signal,
+            });
+        } finally {
+            setBusy(false);
+            abortRef.current = null;
+            setPendingApproval(null);
+        }
     }
 
     let main: ReactNode;
     if (view === "welcome") {
         main = (
             <WelcomeView
-                onConnect={p => {
-                    setProvider(p);
+                onConnect={preset => {
+                    setConfig(c => ({ ...c, baseURL: preset.baseURL, model: preset.model }));
                     setView("connect");
                 }}
             />
@@ -160,13 +296,24 @@ export function App() {
     } else if (view === "connect") {
         main = (
             <ConnectView
-                provider={provider}
+                initialConfig={config}
                 onBack={() => setView("welcome")}
-                onDone={() => setView("chat")}
+                onDone={cfg => {
+                    persistConfig(cfg);
+                    setView("chat");
+                }}
             />
         );
     } else if (view === "settings") {
-        main = <SettingsView onBack={() => setView("chat")} />;
+        main = (
+            <SettingsView
+                config={config}
+                onConfigChange={persistConfig}
+                agentSettings={agentSettings}
+                onAgentSettingsChange={persistAgentSettings}
+                onBack={() => setView("chat")}
+            />
+        );
     } else if (view === "task") {
         main = <TaskView onStop={() => setView("chat")} />;
     } else if (view === "history" || view === "recipes") {
@@ -183,9 +330,19 @@ export function App() {
                 draft={draft}
                 setDraft={setDraft}
                 onSend={send}
-                model={model}
+                model={config.model}
                 onOpenModel={() => setSheet(true)}
                 busy={busy}
+                onStop={handleStop}
+                activeTab={activeTab}
+                attachPage={attachPage}
+                onToggleAttach={setAttachPage}
+                attachments={attachments}
+                onRemoveAttachment={ref => setAttachments(a => a.filter(x => x.ref !== ref))}
+                picking={picking}
+                onTogglePicker={togglePicker}
+                pendingApproval={pendingApproval}
+                onApprove={handleApprove}
             />
         );
     }
@@ -196,7 +353,7 @@ export function App() {
         <div className={cn("relative flex flex-col h-full bg-surface-base", "shadow-[var(--shadow-rail)]")}>
             {showChrome && (
                 <TopBar
-                    model={model}
+                    model={config.model}
                     view={view}
                     onOpenModel={() => setSheet(true)}
                     onOpenSettings={() => setView("settings")}
@@ -206,10 +363,10 @@ export function App() {
             <div className="flex-1 min-h-0 flex flex-col">{main}</div>
             {sheet && (
                 <ModelSheet
-                    current={MODEL_LABELS[model]}
+                    currentModel={config.model}
                     onClose={() => setSheet(false)}
-                    onPick={label => {
-                        setModel(labelToModel(label));
+                    onPick={preset => {
+                        persistConfig({ ...config, baseURL: preset.baseURL, model: preset.model });
                         setSheet(false);
                     }}
                 />
