@@ -8,6 +8,7 @@
     "scripts": {
         "format:check": "prettier \"**/*.{ts,tsx,css,json,yml,yaml,md}\" --check --debug-check --ignore-path .prettierignore",
         "format": "prettier \"**/*.{ts,tsx,css,json,yml,yaml,md}\" --write --ignore-path .prettierignore",
+        "lint": "eslint --flag unstable_native_nodejs_ts_config .",
         "dev": "wxt",
         "dev:firefox": "wxt -b firefox",
         "build": "wxt build",
