@@ -1,0 +1,21 @@
+{
+    "editor.detectIndentation": false,
+    "editor.tabSize": 4,
+    "editor.indentSize": "tabSize",
+    "editor.formatOnSave": false,
+
+    "tailwindCSS.experimental.configFile": "src/index.css",
+    "emeraldwalk.runonsave": {
+        "commands": [
+            {
+                "match": "\\.(js|ts|tsx|css|json|jsonc|yml|yaml|html)$",
+                "cmd": "pnpx prettier --write ${file} --ignore-path .prettierignore"
+            }
+        ]
+    },
+
+    "[yaml]": {
+        "editor.tabSize": 4,
+        "editor.indentSize": "tabSize"
+    }
+}
