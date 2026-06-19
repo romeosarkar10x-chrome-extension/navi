@@ -1,5 +1,6 @@
 {
   "name": "navi",
+  "author": "Romeo Sarkar",
   "description": "AI-powered browser copilot sidebar",
   "private": true,
   "version": "0.0.0",
