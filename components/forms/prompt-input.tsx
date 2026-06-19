@@ -48,7 +48,8 @@ export function PromptInput({
 
     const canSend = value.trim().length > 0 && !disabled;
     function handleKey(e: KeyboardEvent<HTMLTextAreaElement>) {
-        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        // Enter sends; Shift+Enter (or IME composition) inserts a newline.
+        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             if (canSend) onSend?.();
         }
