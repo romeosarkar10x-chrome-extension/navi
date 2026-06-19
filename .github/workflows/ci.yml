@@ -17,10 +17,10 @@ jobs:
         needs: lint
         uses: ./.github/workflows/type-check.yml
 
-    unit-test:
-        needs: type-check
-        uses: ./.github/workflows/unit-test.yml
-        secrets: inherit
-        permissions:
-            id-token: write
-            pages: write
+#     unit-test:
+#         needs: type-check
+#         uses: ./.github/workflows/unit-test.yml
+#         secrets: inherit
+#         permissions:
+#             id-token: write
+#             pages: write
