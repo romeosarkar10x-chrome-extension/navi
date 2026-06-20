@@ -97,7 +97,8 @@ export function TopBar({ model, view, onOpenModel, onOpenSettings, onNav }: TopB
                 <Tooltip
                     label="Collapse"
                     kbd="⌘⇧N"
-                    side="bottom">
+                    side="bottom"
+                    align="right">
                     <IconButton
                         icon="panel-right-close"
                         label="Collapse"
