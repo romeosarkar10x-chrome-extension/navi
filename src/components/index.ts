@@ -10,6 +10,7 @@ export { Kbd } from "./core/kbd";
 export { Input, type InputProps } from "./forms/input";
 export { APIKeyInput, type APIKeyInputProps } from "./forms/api-key-input";
 export { Select, type SelectProps, type SelectOption } from "./forms/select";
+export { Dropdown, type DropdownProps } from "./forms/dropdown";
 export { Switch, type SwitchProps } from "./forms/switch";
 export { Slider, type SliderProps } from "./forms/slider";
 export { PromptInput, type PromptInputProps } from "./forms/prompt-input";

@@ -67,6 +67,13 @@ export async function chatComplete(
     return completion.choices[0]?.message?.content ?? "";
 }
 
+/** Fetch the model IDs the endpoint exposes (`GET /models`), sorted. Throws on failure. */
+export async function listModels(config: ProviderConfig, signal?: AbortSignal): Promise<string[]> {
+    const client = createClient(config);
+    const page = await client.models.list({ signal });
+    return page.data.map(m => m.id).sort();
+}
+
 /** Make a minimal request to verify the endpoint, model, and key are valid. Throws on failure. */
 export async function testConnection(config: ProviderConfig): Promise<void> {
     const client = createClient(config);

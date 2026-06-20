@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { APIKeyInput, Banner, Button, Icon, Input, StatusDot } from "@/components/index";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { APIKeyInput, Banner, Button, Dropdown, Icon, Input, StatusDot } from "@/components/index";
 import { isConfigReady, matchPreset, PRESETS, type ProviderConfig, type ProviderPreset } from "@/lib/providers";
-import { testConnection } from "@/lib/chat-client";
+import { listModels, testConnection } from "@/lib/chat-client";
 
 type TestState = "idle" | "testing" | "ok" | "error";
+type ModelsState = "idle" | "loading" | "ok" | "error";
 
 export interface ConnectViewProps {
     initialConfig: ProviderConfig;
@@ -15,6 +16,10 @@ export function ConnectView({ initialConfig, onBack, onDone }: ConnectViewProps)
     const [config, setConfig] = useState<ProviderConfig>(initialConfig);
     const [test, setTest] = useState<TestState>("idle");
     const [testError, setTestError] = useState("");
+    const [models, setModels] = useState<string[]>([]);
+    const [modelsState, setModelsState] = useState<ModelsState>("idle");
+    const [modelsError, setModelsError] = useState("");
+    const abortRef = useRef<AbortController | null>(null);
     const activePreset = matchPreset(config);
     const ready = isConfigReady(config);
 
@@ -28,6 +33,39 @@ export function ConnectView({ initialConfig, onBack, onDone }: ConnectViewProps)
         setConfig(c => ({ ...c, ...part }));
         setTest("idle");
     }
+
+    // Pull the endpoint's model list so the user picks from what's actually available
+    // instead of typing a name by hand. Keyed on endpoint + key; model is chosen here.
+    const loadModels = useCallback(async (baseURL: string, apiKey: string) => {
+        if (!baseURL.trim()) return;
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+        setModelsState("loading");
+        setModelsError("");
+        try {
+            const ids = await listModels({ baseURL, apiKey, model: "" }, controller.signal);
+            if (controller.signal.aborted) return;
+            setModels(ids);
+            setModelsState("ok");
+            // Keep the chosen model if the endpoint offers it; otherwise default to the first.
+            setConfig(c => (ids.includes(c.model) ? c : { ...c, model: ids[0] ?? c.model }));
+        } catch (err) {
+            if (controller.signal.aborted) return;
+            setModels([]);
+            setModelsState("error");
+            setModelsError(err instanceof Error ? err.message : "Couldn't list models");
+        }
+    }, []);
+
+    // Auto-fetch on mount and whenever the endpoint or key settles (debounced past typing).
+    useEffect(() => {
+        const t = setTimeout(() => loadModels(config.baseURL, config.apiKey), 350);
+        return () => clearTimeout(t);
+    }, [config.baseURL, config.apiKey, loadModels]);
+
+    // Drop any in-flight request if the view unmounts.
+    useEffect(() => () => abortRef.current?.abort(), []);
 
     async function runTest() {
         setTest("testing");
@@ -92,15 +130,43 @@ export function ConnectView({ initialConfig, onBack, onDone }: ConnectViewProps)
                 onChange={e => patch({ baseURL: e.target.value })}
             />
 
-            <label className="block text-sm font-medium text-body mt-3 mb-[7px]">Model</label>
-            <Input
-                icon="cpu"
-                value={config.model}
-                onChange={e => patch({ model: e.target.value })}
-            />
+            <div className="flex items-center justify-between mt-3 mb-[7px]">
+                <label className="block text-sm font-medium text-body">Model</label>
+                <button
+                    type="button"
+                    onClick={() => loadModels(config.baseURL, config.apiKey)}
+                    disabled={!config.baseURL.trim() || modelsState === "loading"}
+                    className="inline-flex items-center gap-[5px] text-2xs font-ui text-muted cursor-pointer hover:text-strong disabled:opacity-50 disabled:cursor-default">
+                    <Icon
+                        name="loader"
+                        size={12}
+                        className={modelsState === "loading" ? "animate-spin" : ""}
+                    />
+                    {modelsState === "loading" ? "Loading…" : "Refresh"}
+                </button>
+            </div>
+            {modelsState === "ok" && models.length > 0 ? (
+                <Dropdown
+                    value={config.model}
+                    options={models}
+                    onChange={value => patch({ model: value })}
+                />
+            ) : (
+                <Input
+                    icon="cpu"
+                    value={config.model}
+                    placeholder={modelsState === "loading" ? "Loading models…" : "Enter a model name"}
+                    onChange={e => patch({ model: e.target.value })}
+                />
+            )}
+            {modelsState === "error" && modelsError && (
+                <div className="text-2xs text-muted font-mono mt-2 break-words">
+                    Couldn’t list models — enter one manually. {modelsError}
+                </div>
+            )}
 
             <label className="block text-sm font-medium text-body mt-3 mb-[7px]">
-                API key{!activePreset?.requiresKey && <span className="text-faint font-normal"> · optional</span>}
+                API key<span className="text-faint font-normal"> · optional</span>
             </label>
             <APIKeyInput
                 value={config.apiKey}

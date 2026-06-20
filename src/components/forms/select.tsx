@@ -52,7 +52,10 @@ export function Select({
                     return (
                         <option
                             key={opt.value}
-                            value={opt.value}>
+                            value={opt.value}
+                            // Native option popups don't inherit the trigger's theme — set both
+                            // colors explicitly so text stays legible (otherwise white-on-white).
+                            className="bg-surface-raised text-strong">
                             {opt.label}
                         </option>
                     );
