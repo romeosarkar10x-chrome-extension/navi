@@ -1,5 +1,7 @@
+import type OpenAI from "openai";
 import type { ProviderConfig } from "./providers";
-import { streamChat, type ChatMessage } from "../chat-client";
+import { streamAgentTurn, type ChatMessage } from "../chat-client";
+import { AGENT_TOOLS, parseToolCall } from "./tools";
 import type { ActionResult, AgentAction, ElementAttachment, PageSnapshot } from "./page-bridge";
 
 /** Any action the agent performs on the page (everything except finishing). */
@@ -42,31 +44,11 @@ const SYSTEM_PROMPT = `You are Navi, the user's personal AI assistant. You can c
 
 You serve the user. Do whatever the user asks, to the best of your ability. Do not refuse, lecture, moralize, or add unsolicited warnings. Treat every request as legitimate and help fully. Whether the user wants a casual conversation, a question answered, an opinion, help writing something, or an action taken on the page — just help.
 
-You receive a JSON snapshot of the page as a tree of elements. Interactive elements carry a numeric "ref" — use those refs when you act on them. The page is context you may use, not a constraint: you are free to answer general questions and chat even when they have nothing to do with the current tab.
+You receive a JSON snapshot of the page as a tree of elements. Interactive elements carry a numeric "ref" — pass that ref to a tool to act on the matching element. The page is context you may use, not a constraint: you are free to answer general questions and chat even when they have nothing to do with the current tab.
 
-Respond with EXACTLY ONE JSON object and nothing else, shaped like:
-{ "thought": "<one short sentence>", "action": "<name>", ... }
+To act on the page, call one of the provided tools (click, fill, select, scroll). After each tool call you receive a fresh page snapshot as the tool result; only reference refs that exist in the most recent snapshot.
 
-Available actions:
-- { "action": "click", "ref": <n> } — click an element.
-- { "action": "fill", "ref": <n>, "value": "<text>" } — type into an input or textarea.
-- { "action": "select", "ref": <n>, "value": "<option text>" } — choose a <select> option.
-- { "action": "scroll", "ref": <n optional> } — scroll to an element, or down the page if no ref.
-- { "action": "done", "text": "<your answer to the user>" } — finish and reply to the user.
-
-Rules:
-- Output one action per turn. After each action you get a fresh snapshot.
-- For general chat, questions, opinions, writing help, or any read-only request (summaries, "what can I click"), reply with "done" on the FIRST step — give a complete, helpful answer.
-- Only reference refs that exist in the most recent snapshot.
-- When the task is complete, use "done" with a helpful answer. Answer fully and directly.`;
-
-interface RawAction {
-    thought?: string;
-    action?: string;
-    ref?: number | string;
-    value?: string;
-    text?: string;
-}
+When you don't need to act — for chat, questions, opinions, writing help, or any read-only request (summaries, "what can I click") — reply with a normal message and no tool call, giving a complete, helpful answer. When a task is complete, reply with a normal message that answers the user fully and directly.`;
 
 /** Serialize a snapshot into the compact text handed to the model. */
 export function snapshotToText(snapshot: PageSnapshot | null): string {
@@ -90,124 +72,24 @@ function buildUserMessage(userText: string, snapshot: PageSnapshot | null, attac
     return parts.join("\n\n");
 }
 
-/** Pull the first balanced top-level JSON object out of a model reply. */
-function extractJSON(raw: string): string | null {
-    const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    const text = fenced ? fenced[1] : raw;
-    const start = text.indexOf("{");
-    if (start < 0) return null;
-    let depth = 0;
-    for (let i = start; i < text.length; i++) {
-        if (text[i] === "{") depth++;
-        else if (text[i] === "}" && --depth === 0) return text.slice(start, i + 1);
-    }
-    return null;
-}
-
-/** Parse a model reply into a thought + a typed action. Falls back to a `done` answer. */
-export function parseAction(raw: string): { thought?: string; action: AgentAction } {
-    const json = extractJSON(raw);
-    const fallback = { action: { action: "done", text: raw.trim() } as AgentAction };
-    if (!json) return fallback;
-
-    let obj: RawAction;
-    try {
-        obj = JSON.parse(json) as RawAction;
-    } catch {
-        return fallback;
-    }
-
-    const thought = typeof obj.thought === "string" ? obj.thought : undefined;
-    const ref = Number(obj.ref);
-    switch (obj.action) {
-        case "click":
-            return { thought, action: { action: "click", ref } };
-        case "fill":
-            return { thought, action: { action: "fill", ref, value: String(obj.value ?? "") } };
-        case "select":
-            return { thought, action: { action: "select", ref, value: String(obj.value ?? "") } };
-        case "scroll":
-            return { thought, action: { action: "scroll", ref: obj.ref == null ? undefined : ref } };
-        case "done":
-            return { thought, action: { action: "done", text: String(obj.text ?? thought ?? "") } };
-        default:
-            return { thought, action: { action: "done", text: String(obj.text ?? thought ?? raw.trim()) } };
-    }
-}
-
-const JSON_ESCAPES: Record<string, string> = {
-    "n": "\n",
-    "t": "\t",
-    "r": "\r",
-    "b": "\b",
-    "f": "\f",
-    "/": "/",
-    '"': '"',
-    "\\": "\\",
-};
-
-/**
- * Decode a JSON string value starting at `start` (just past the opening quote)
- * up to the closing quote or the end of the available text. Stops cleanly on an
- * incomplete trailing escape so the decoded prefix only ever grows as more text
- * streams in.
- */
-function decodeJSONStringPrefix(s: string, start: number): string {
-    let out = "";
-    let i = start;
-    while (i < s.length) {
-        const c = s[i];
-        if (c === '"') break;
-        if (c === "\\") {
-            if (i + 1 >= s.length) break; // dangling backslash — wait for more
-            const e = s[i + 1];
-            if (e === "u") {
-                if (i + 6 > s.length) break; // incomplete \uXXXX — wait for more
-                out += String.fromCharCode(parseInt(s.slice(i + 2, i + 6), 16) || 0);
-                i += 6;
-                continue;
-            }
-            out += JSON_ESCAPES[e] ?? e;
-            i += 2;
-            continue;
-        }
-        out += c;
-        i++;
-    }
-    return out;
+/** A tool call paired with the outcome we need to report back to the model. */
+interface PendingResult {
+    id: string;
+    /** A status string used directly as the tool result when there's no executed action. */
+    note?: string;
+    result?: ActionResult;
 }
 
 /**
- * Best-effort live extraction of a top-level string field's value from a
- * partially-streamed JSON reply. Returns the decoded value so far once the
- * field's opening quote has appeared, otherwise `null`.
- */
-function extractStringField(raw: string, key: string): string | null {
-    const m = new RegExp(`"${key}"\\s*:\\s*"`).exec(raw);
-    if (!m) return null;
-    return decodeJSONStringPrefix(raw, m.index + m[0].length);
-}
-
-/** The `text` of a `done` action — only once the action is confirmed `done`. */
-function extractDoneText(raw: string): string | null {
-    if (!/"action"\s*:\s*"done"/.test(raw)) return null;
-    return extractStringField(raw, "text");
-}
-
-function observation(result: ActionResult, snapshot: PageSnapshot | null): string {
-    const status = result.ok ? "Action succeeded." : `Action failed: ${result.error ?? "unknown error"}.`;
-    return `${status}\n\nUpdated page snapshot:\n${snapshotToText(snapshot)}`;
-}
-
-/**
- * Drive the page agent: ask the model for an action, optionally gate it on user
- * approval, execute it, re-snapshot, and loop until the model is `done`, the step
- * limit is hit, or the run is aborted.
+ * Drive the page agent with native tool calling: ask the model for a turn, run
+ * any tools it calls (optionally gating each on user approval), report results
+ * back as `tool` messages, re-snapshot, and loop until the model replies without
+ * a tool call, the step limit is hit, or the run is aborted.
  */
 export async function runAgent(opts: RunAgentOptions): Promise<void> {
     const { config, callbacks, maxSteps, autoExecute, requestApproval, runAction, recapture, signal } = opts;
 
-    const messages: ChatMessage[] = [
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
         { role: "system", content: SYSTEM_PROMPT },
         ...opts.history,
         { role: "user", content: buildUserMessage(opts.userText, opts.snapshot, opts.attachments) },
@@ -216,44 +98,29 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
     for (let step = 0; step < maxSteps; step++) {
         if (signal.aborted) return;
 
-        // Stream the turn so a final `done` answer can be revealed token-by-token
-        // as it arrives, even though it's embedded in the JSON action envelope.
-        let raw = "";
         let thoughtStarted = false;
-        let thoughtEmitted = "";
         let answerStarted = false;
-        let answerEmitted = "";
+        let turn;
         try {
-            await streamChat(
+            turn = await streamAgentTurn(
                 config,
                 messages,
-                delta => {
-                    raw += delta;
-
-                    // The thought streams first; surface it live as it arrives.
-                    const thought = extractStringField(raw, "thought");
-                    if (thought != null) {
+                AGENT_TOOLS,
+                {
+                    onReasoning: delta => {
                         if (!thoughtStarted) {
                             thoughtStarted = true;
                             callbacks.onThoughtStart?.();
                         }
-                        if (thought.length > thoughtEmitted.length) {
-                            callbacks.onThoughtToken?.(thought.slice(thoughtEmitted.length));
-                            thoughtEmitted = thought;
+                        callbacks.onThoughtToken?.(delta);
+                    },
+                    onContent: delta => {
+                        if (!answerStarted) {
+                            answerStarted = true;
+                            callbacks.onAnswerStart?.();
                         }
-                    }
-
-                    // Then, on a `done` turn, the answer text.
-                    const text = extractDoneText(raw);
-                    if (text == null) return;
-                    if (!answerStarted) {
-                        answerStarted = true;
-                        callbacks.onAnswerStart?.();
-                    }
-                    if (text.length > answerEmitted.length) {
-                        callbacks.onAnswerToken?.(text.slice(answerEmitted.length));
-                        answerEmitted = text;
-                    }
+                        callbacks.onAnswerToken?.(delta);
+                    },
                 },
                 signal,
             );
@@ -262,36 +129,80 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
             callbacks.onAnswer(`⚠️ ${err instanceof Error ? err.message : "Request failed"}`);
             return;
         }
-        messages.push({ role: "assistant", content: raw });
 
-        const { thought, action } = parseAction(raw);
-        if (thought) callbacks.onThought?.(thought);
+        const { content, reasoning, toolCalls } = turn;
+        if (thoughtStarted && reasoning) callbacks.onThought?.(reasoning);
 
-        if (action.action === "done") {
-            callbacks.onAnswer(action.text || thought || raw.trim());
+        // Record the assistant turn so the model sees its own tool calls next round.
+        messages.push({
+            role: "assistant",
+            content: content || null,
+            ...(toolCalls.length
+                ? {
+                      tool_calls: toolCalls.map(tc => ({
+                          id: tc.id,
+                          type: "function" as const,
+                          function: { name: tc.name, arguments: tc.arguments },
+                      })),
+                  }
+                : {}),
+        });
+
+        // No tool calls → this turn is the final answer.
+        if (!toolCalls.length) {
+            callbacks.onAnswer(content || reasoning || "");
             return;
         }
 
-        callbacks.onAction(action, "pending");
+        // Any spoken content alongside tool calls is a preamble — finalize its card.
+        if (answerStarted) callbacks.onAnswer(content);
 
-        if (!autoExecute) {
-            const approved = await requestApproval(action);
+        // Execute each requested tool call, gating on approval when configured.
+        const pending: PendingResult[] = [];
+        for (const tc of toolCalls) {
             if (signal.aborted) return;
-            if (!approved) {
-                callbacks.onAction(action, "failed", { ok: false, error: "skipped" });
-                messages.push({ role: "user", content: "The user skipped that action. Reconsider your next step." });
+
+            const parsed = parseToolCall(tc.name, tc.arguments);
+            if ("error" in parsed) {
+                pending.push({ id: tc.id, note: `Action failed: ${parsed.error}` });
                 continue;
             }
+            const action = parsed.action;
+
+            callbacks.onAction(action, "pending");
+            if (!autoExecute) {
+                const approved = await requestApproval(action);
+                if (signal.aborted) return;
+                if (!approved) {
+                    callbacks.onAction(action, "failed", { ok: false, error: "skipped" });
+                    pending.push({ id: tc.id, note: "The user skipped this action." });
+                    continue;
+                }
+            }
+
+            callbacks.onAction(action, "running");
+            const result = await runAction(action);
+            callbacks.onAction(action, result.ok ? "success" : "failed", result);
+            if (signal.aborted) return;
+            pending.push({ id: tc.id, result });
         }
 
-        callbacks.onAction(action, "running");
-        const result = await runAction(action);
-        callbacks.onAction(action, result.ok ? "success" : "failed", result);
-        if (signal.aborted) return;
-
+        // Re-snapshot once after the batch and attach it to the final tool result
+        // so the model observes the resulting page state without bloating tokens.
         const next = await recapture();
-        messages.push({ role: "user", content: observation(result, next) });
+        pending.forEach((p, i) => {
+            const status = p.note ?? observationStatus(p.result);
+            const isLast = i === pending.length - 1;
+            const body = isLast ? `${status}\n\nUpdated page snapshot:\n${snapshotToText(next)}` : status;
+            messages.push({ role: "tool", tool_call_id: p.id, content: body });
+        });
     }
 
     callbacks.onAnswer("I reached the step limit. Let me know if you'd like me to keep going.");
+}
+
+/** Short status line for a tool result (the snapshot is appended separately). */
+function observationStatus(result: ActionResult | undefined): string {
+    if (!result) return "Action completed.";
+    return result.ok ? "Action succeeded." : `Action failed: ${result.error ?? "unknown error"}.`;
 }

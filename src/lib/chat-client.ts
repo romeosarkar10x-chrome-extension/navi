@@ -49,6 +49,89 @@ export async function streamChat(
     return full;
 }
 
+/** A single tool call the model asked for, assembled from streamed deltas. */
+export interface ToolCall {
+    id: string;
+    name: string;
+    arguments: string;
+}
+
+/** The outcome of one agent turn: spoken text, optional reasoning, and any tool calls. */
+export interface AgentTurnResult {
+    content: string;
+    reasoning: string;
+    toolCalls: ToolCall[];
+}
+
+export interface AgentTurnHandlers {
+    /** A chunk of the assistant's spoken text (the final answer when no tools are called). */
+    onContent?: (delta: string) => void;
+    /** A chunk of the model's reasoning, when the endpoint streams a separate reasoning field. */
+    onReasoning?: (delta: string) => void;
+}
+
+/**
+ * Stream one agent turn with tool calling enabled. Surfaces `content` and
+ * `reasoning` deltas live and assembles streamed `tool_calls` by index,
+ * resolving with the complete turn once the stream ends.
+ */
+export async function streamAgentTurn(
+    config: ProviderConfig,
+    messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+    tools: OpenAI.Chat.Completions.ChatCompletionTool[],
+    handlers: AgentTurnHandlers,
+    signal?: AbortSignal,
+): Promise<AgentTurnResult> {
+    const client = createClient(config);
+
+    const stream = await client.chat.completions.create(
+        {
+            model: config.model.trim(),
+            messages,
+            tools,
+            tool_choice: "auto",
+            stream: true,
+        },
+        { signal },
+    );
+
+    let content = "";
+    let reasoning = "";
+    const acc = new Map<number, ToolCall>();
+
+    for await (const chunk of stream) {
+        // `reasoning_content`/`reasoning` are non-standard fields some endpoints
+        // (e.g. Qwen, DeepSeek) emit; they aren't in the SDK's typed delta.
+        const delta = chunk.choices[0]?.delta as
+            | (OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & {
+                  reasoning_content?: string;
+                  reasoning?: string;
+              })
+            | undefined;
+        if (!delta) continue;
+
+        if (delta.content) {
+            content += delta.content;
+            handlers.onContent?.(delta.content);
+        }
+        const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
+        if (reasoningDelta) {
+            reasoning += reasoningDelta;
+            handlers.onReasoning?.(reasoningDelta);
+        }
+        for (const tc of delta.tool_calls ?? []) {
+            const cur = acc.get(tc.index) ?? { id: "", name: "", arguments: "" };
+            if (tc.id) cur.id = tc.id;
+            if (tc.function?.name) cur.name = tc.function.name;
+            if (tc.function?.arguments) cur.arguments += tc.function.arguments;
+            acc.set(tc.index, cur);
+        }
+    }
+
+    const toolCalls = [...acc.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v);
+    return { content, reasoning, toolCalls };
+}
+
 /** Non-streaming completion — returns the full assistant text. Used by the agent loop. */
 export async function chatComplete(
     config: ProviderConfig,
