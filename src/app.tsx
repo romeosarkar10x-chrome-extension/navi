@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Icon, type ActionDetail, type ActionStatus, type ActionType, type IconName } from "@/components/index";
 import { cn } from "@/lib/cn";
-import { DEFAULT_CONFIG, type ProviderConfig } from "@/lib/providers";
+import { DEFAULT_CONFIG, isConfigReady, type ProviderConfig } from "@/lib/providers";
 import {
     DEFAULT_AGENT_SETTINGS,
     loadAgentSettings,
@@ -123,6 +123,7 @@ function EmptyView({ kind, onBack }: { kind: "history" | "recipes"; onBack: () =
 
 export function App() {
     const [view, setView] = useState<ViewKey>("welcome");
+    const [hydrated, setHydrated] = useState(false);
     const [config, setConfig] = useState<ProviderConfig>(DEFAULT_CONFIG);
     const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_AGENT_SETTINGS);
     const [sheet, setSheet] = useState(false);
@@ -140,8 +141,13 @@ export function App() {
     const pickerDisposeRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
-        loadConfig().then(setConfig);
-        loadAgentSettings().then(setAgentSettings);
+        Promise.all([loadConfig(), loadAgentSettings()]).then(([cfg, agent]) => {
+            setConfig(cfg);
+            setAgentSettings(agent);
+            // Skip the welcome/connect flow when a usable config is already saved.
+            if (isConfigReady(cfg)) setView("chat");
+            setHydrated(true);
+        });
         return () => pickerDisposeRef.current?.();
     }, []);
 
@@ -312,6 +318,12 @@ export function App() {
 
     function handleStreamComplete(id: string) {
         setMessages(m => m.map(x => (x.id === id ? { ...x, streaming: false } : x)));
+    }
+
+    // Hold the first paint until storage is read, so we don't flash the welcome
+    // view before resuming a saved config.
+    if (!hydrated) {
+        return <div className="h-full bg-surface-base" />;
     }
 
     let main: ReactNode;
