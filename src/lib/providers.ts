@@ -40,8 +40,8 @@ export const PRESETS: ProviderPreset[] = [
 ];
 
 export const DEFAULT_CONFIG: ProviderConfig = {
-    baseURL: PRESETS[0].baseURL,
-    model: PRESETS[0].model,
+    baseURL: "",
+    model: "",
     apiKey: "",
 };
 
