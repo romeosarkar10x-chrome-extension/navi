@@ -24,9 +24,11 @@ export interface PromptInputProps {
     onSend?: () => void;
     onAttach?: () => void;
     onModelClick?: () => void;
-    model?: string;
+    model: string;
     placeholder?: string;
-    disabled?: boolean;
+    // disabled?: boolean;
+    onStop: () => void;
+    busy: boolean;
     className?: string;
     picking: boolean;
     onTogglePicker: () => void;
@@ -39,9 +41,11 @@ export function PromptInput({
     onSend,
     onAttach,
     onModelClick,
-    model = "claude-sonnet-4",
-    placeholder = "Ask Navi about this page…",
-    disabled = false,
+    model,
+    placeholder = "Ask Navi about this page...",
+    // disabled = false,
+    busy,
+    onStop,
     className = "",
     picking,
     onTogglePicker,
@@ -54,7 +58,8 @@ export function PromptInput({
         el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
     }, [value]);
 
-    const canSend = value.trim().length > 0 && !disabled;
+    const canSend = value.trim().length > 0 && !busy;
+
     function handleKey(e: KeyboardEvent<HTMLTextAreaElement>) {
         // Enter sends; Shift+Enter (or IME composition) inserts a newline.
         if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -76,7 +81,6 @@ export function PromptInput({
                 rows={1}
                 value={value}
                 placeholder={placeholder}
-                disabled={disabled}
                 onChange={e => onChange?.(e.target.value)}
                 onKeyDown={handleKey}
                 className="w-full border-none outline-none resize-none bg-transparent font-ui text-base leading-snug text-strong min-h-[20px] max-h-[96px] placeholder:text-faint"
@@ -117,18 +121,31 @@ export function PromptInput({
                     />
                 </button>
                 <span className="flex-1" />
-                <button
-                    type="button"
-                    className={SEND_CLS}
-                    disabled={!canSend}
-                    onClick={() => canSend && onSend?.()}
-                    aria-label="Send">
-                    <Icon
-                        name="arrow-up"
-                        size={17}
-                        strokeWidth={2.25}
-                    />
-                </button>
+                {!busy ? (
+                    <button
+                        type="button"
+                        onClick={onStop}
+                        className={cn(CHIP_BTN, "ml-auto border-line text-error hover:border-line-strong")}>
+                        {" "}
+                        <Icon
+                            name="square"
+                            size={12}
+                        />
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        className={SEND_CLS}
+                        disabled={!canSend}
+                        onClick={() => canSend && onSend?.()}
+                        aria-label="Send">
+                        <Icon
+                            name="arrow-up"
+                            size={17}
+                            strokeWidth={2.25}
+                        />
+                    </button>
+                )}
             </div>
         </div>
     );

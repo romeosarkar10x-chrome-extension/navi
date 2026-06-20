@@ -1,21 +1,10 @@
 import { useEffect, useRef } from "react";
-import {
-    AgentActionCard,
-    Button,
-    ChatMessage,
-    ContextPill,
-    Icon,
-    Markdown,
-    PromptInput,
-    // QuickActions,
-    StreamingIndicator,
-    StreamingMarkdown,
-    ThinkingBlock,
-} from "@/components/index";
+import { Button, ContextPill, Icon, PromptInput } from "@/components/index";
 import { cn } from "@/lib/cn";
 import type { ActiveTab, ElementAttachment } from "@/lib/page-bridge";
 import type { ExecutableAction } from "@/lib/agent";
 import type { ChatTurn } from "../types";
+import { Messages } from "@/components/chat/messages";
 
 const CHIP_BTN =
     "inline-flex items-center gap-[5px] rounded-full py-[3px] px-[8px] font-ui text-2xs cursor-pointer border " +
@@ -110,55 +99,16 @@ export function ChatView({
 
     return (
         <div className="flex-1 min-h-0 flex flex-col">
-            <div
-                ref={scrollRef}
-                className="flex-1 min-h-0 overflow-y-auto py-4 px-[14px] flex flex-col gap-[14px] navi-scroll">
-                {messages.map((m, i) =>
-                    m.kind === "action" ? (
-                        <AgentActionCard
-                            key={i}
-                            type={m.type}
-                            label={m.label}
-                            status={m.status}
-                            detail={m.detail}
-                            defaultOpen={m.open}
-                        />
-                    ) : m.kind === "thought" ? (
-                        <ThinkingBlock
-                            key={i}
-                            text={m.text ?? ""}
-                            streaming={m.streaming}
-                            streamDone={m.streamDone}
-                            open={m.open}
-                            onToggle={() => m.id && onToggleThought(m.id)}
-                            onComplete={() => m.id && onStreamComplete(m.id)}
-                        />
-                    ) : (
-                        <ChatMessage
-                            key={i}
-                            role={m.role}
-                            meta={m.meta}
-                            initials="JD">
-                            {m.role === "assistant" && m.streaming ? (
-                                <StreamingMarkdown
-                                    text={m.text ?? ""}
-                                    done={!!m.streamDone}
-                                    onComplete={() => m.id && onStreamComplete(m.id)}
-                                />
-                            ) : m.role === "assistant" && m.text != null ? (
-                                <Markdown source={m.text} />
-                            ) : (
-                                m.body
-                            )}
-                        </ChatMessage>
-                    ),
-                )}
-                {busy && !pendingApproval && !streamingNow && (
-                    <div className="py-[2px] px-1">
-                        <StreamingIndicator label="Navi is working…" />
-                    </div>
-                )}
-            </div>
+            <Messages
+                {...{
+                    messages,
+                    busy,
+                    onStreamComplete,
+                    onToggleThought,
+                    scrollRef,
+                    pendingApproval,
+                }}
+            />
 
             <div className="flex-none border-t border-line bg-surface-base pt-[10px] px-3 pb-3 flex flex-col gap-[9px]">
                 {pendingApproval && (
@@ -218,44 +168,14 @@ export function ChatView({
                             {a.descriptor}
                         </ContextPill>
                     ))}
-                    {busy && (
-                        <button
-                            type="button"
-                            onClick={onStop}
-                            className={cn(CHIP_BTN, "ml-auto border-line text-error hover:border-line-strong")}>
-                            <Icon
-                                name="square"
-                                size={11}
-                            />
-                            Stop
-                        </button>
-                    )}
                 </div>
 
-                {/*<QuickActions
-                    actions={[
-                        { icon: "scan-text", label: "Summarize page", onClick: () => onSend("Summarize this page") },
-                        {
-                            icon: "table",
-                            label: "Extract data",
-                            onClick: () => onSend("Extract the main data on this page as a table"),
-                        },
-                        {
-                            icon: "mouse-pointer-click",
-                            label: "What can I click?",
-                            onClick: () =>
-                                onSend("What are the main things I can click or interact with on this page?"),
-                        },
-                    ]}
-                />*/}
                 <PromptInput
                     value={draft}
                     onChange={setDraft}
                     onSend={() => onSend(draft)}
-                    model={model}
                     onModelClick={onOpenModel}
-                    disabled={busy}
-                    {...{ picking, onTogglePicker }}
+                    {...{ model, busy, onStop, picking, onTogglePicker }}
                 />
             </div>
         </div>
