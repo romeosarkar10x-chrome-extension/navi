@@ -5,6 +5,7 @@ import {
     ChatMessage,
     ContextPill,
     Icon,
+    Markdown,
     PromptInput,
     QuickActions,
     StreamingIndicator,
@@ -105,7 +106,7 @@ export function ChatView({
                             role={m.role}
                             meta={m.meta}
                             initials="JD">
-                            {m.body}
+                            {m.role === "assistant" && m.text != null ? <Markdown source={m.text} /> : m.body}
                         </ChatMessage>
                     ),
                 )}
