@@ -14,6 +14,10 @@ const MODEL_CLS =
     "bg-surface-raised border border-line rounded-full pl-[7px] pr-[8px] py-[3px] cursor-pointer " +
     "transition duration-[120ms] ease-[var(--ease-out)] hover:text-strong hover:border-line-strong";
 
+const CHIP_BTN =
+    "inline-flex items-center gap-[5px] rounded-full py-[3px] px-[8px] font-ui text-2xs cursor-pointer border " +
+    "transition duration-[120ms] ease-[var(--ease-out)]";
+
 export interface PromptInputProps {
     value?: string;
     onChange?: (value: string) => void;
@@ -24,6 +28,8 @@ export interface PromptInputProps {
     placeholder?: string;
     disabled?: boolean;
     className?: string;
+    picking: boolean;
+    onTogglePicker: () => void;
 }
 
 /** Chat composer — auto-growing textarea with attach, model switcher and send. */
@@ -37,6 +43,8 @@ export function PromptInput({
     placeholder = "Ask Navi about this page…",
     disabled = false,
     className = "",
+    picking,
+    onTogglePicker,
 }: PromptInputProps) {
     const ref = useRef<HTMLTextAreaElement>(null);
     useEffect(() => {
@@ -80,6 +88,20 @@ export function PromptInput({
                     label="Attach context"
                     onClick={onAttach}
                 />
+                <button
+                    type="button"
+                    onClick={onTogglePicker}
+                    className={cn(
+                        CHIP_BTN,
+                        picking
+                            ? "bg-accent-soft border-accent-line text-accent-text"
+                            : "bg-surface-raised border-line text-muted hover:text-strong hover:border-line-strong",
+                    )}>
+                    <Icon
+                        name="mouse-pointer-click"
+                        size={11}
+                    />
+                </button>
                 <button
                     type="button"
                     className={MODEL_CLS}

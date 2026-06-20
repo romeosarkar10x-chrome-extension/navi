@@ -178,21 +178,6 @@ export function ChatView({
                             {a.descriptor}
                         </ContextPill>
                     ))}
-                    <button
-                        type="button"
-                        onClick={onTogglePicker}
-                        className={cn(
-                            CHIP_BTN,
-                            picking
-                                ? "bg-accent-soft border-accent-line text-accent-text"
-                                : "bg-surface-raised border-line text-muted hover:text-strong hover:border-line-strong",
-                        )}>
-                        <Icon
-                            name="mouse-pointer-click"
-                            size={11}
-                        />
-                        {picking ? "Picking… (Esc)" : "Inspect element"}
-                    </button>
                     {busy && (
                         <button
                             type="button"
@@ -230,6 +215,7 @@ export function ChatView({
                     model={model}
                     onModelClick={onOpenModel}
                     disabled={busy}
+                    {...{ picking, onTogglePicker }}
                 />
             </div>
         </div>
