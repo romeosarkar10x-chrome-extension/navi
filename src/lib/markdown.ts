@@ -270,7 +270,7 @@ function parseList(lines: string[], from: number, to: number): { node: BlockNode
 }
 
 function splitRow(line: string): string[] {
-    let s = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+    const s = line.trim().replace(/^\|/, "").replace(/\|$/, "");
     const cells: string[] = [];
     let buf = "";
     for (let k = 0; k < s.length; k++) {

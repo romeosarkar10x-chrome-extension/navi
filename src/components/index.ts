@@ -21,6 +21,7 @@ export { Toast, type ToastProps } from "./feedback/toast";
 export { Tooltip, type TooltipProps } from "./feedback/tooltip";
 
 export { ChatMessage, type ChatMessageProps } from "./chat/chat-message";
+export { Markdown, type MarkdownProps } from "./chat/markdown";
 export {
     AgentActionCard,
     type AgentActionCardProps,
