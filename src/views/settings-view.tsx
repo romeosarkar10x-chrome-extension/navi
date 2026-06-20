@@ -97,7 +97,7 @@ export function SettingsView({
                 </Row>
                 <Row
                     label="API key"
-                    hint={activePreset && !activePreset.requiresKey ? "Not required for this endpoint" : undefined}>
+                    hint="Optional — leave blank for endpoints that don't need one">
                     <APIKeyInput
                         size="sm"
                         className="w-[180px]"
