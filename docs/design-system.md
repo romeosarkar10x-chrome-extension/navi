@@ -26,13 +26,13 @@ The raw palette is defined once in `:root`:
 
 Semantic aliases are then assigned **per theme** so the same utility class adapts:
 
-| Semantic group | Vars |
-| --- | --- |
-| Surfaces | `--surface-base`, `-sunken`, `-card`, `-raised`, `-overlay`, `-agent` |
-| Lines | `--line`, `--line-strong`, `--line-faint` |
-| Text | `--text-strong`, `-body`, `-muted`, `-faint`, `-on-accent` |
-| Accent | `--accent`, `-hover`, `-press`, `-soft`, `-line`, `-text` |
-| Control | `--control`, `-hover`, `-line` |
+| Semantic group | Vars                                                                  |
+| -------------- | --------------------------------------------------------------------- |
+| Surfaces       | `--surface-base`, `-sunken`, `-card`, `-raised`, `-overlay`, `-agent` |
+| Lines          | `--line`, `--line-strong`, `--line-faint`                             |
+| Text           | `--text-strong`, `-body`, `-muted`, `-faint`, `-on-accent`            |
+| Accent         | `--accent`, `-hover`, `-press`, `-soft`, `-line`, `-text`             |
+| Control        | `--control`, `-hover`, `-line`                                        |
 
 ### Themes
 

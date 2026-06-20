@@ -6,15 +6,15 @@ Exhaustive reference for the Navi codebase. For a short orientation, see the roo
 
 ## Contents
 
-| Page | Covers |
-| --- | --- |
-| [architecture.md](architecture.md) | High-level shape, runtime, the agent loop, state model, providers, the `@/` alias. |
-| [entrypoints.md](entrypoints.md) | `background.ts`, `content.ts`, and the `sidepanel/` host. |
-| [lib.md](lib.md) | The non-UI core: providers, chat client, agent loop, page bridge, element picker, storage, markdown parser, `cn`. |
-| [views.md](views.md) | `App` view router and every view module (welcome, connect, chat, task, settings, model sheet, shell). |
-| [components.md](components.md) | The design-system library — every component, its props, and behavior. |
-| [design-system.md](design-system.md) | Tailwind v4 setup, CSS design tokens, themes, type scale, animations, the irreducible CSS. |
-| [build-and-tooling.md](build-and-tooling.md) | WXT, scripts, TypeScript, ESLint, Prettier, CI workflows, repo config. |
+| Page                                         | Covers                                                                                                            |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [architecture.md](architecture.md)           | High-level shape, runtime, the agent loop, state model, providers, the `@/` alias.                                |
+| [entrypoints.md](entrypoints.md)             | `background.ts`, `content.ts`, and the `sidepanel/` host.                                                         |
+| [lib.md](lib.md)                             | The non-UI core: providers, chat client, agent loop, page bridge, element picker, storage, markdown parser, `cn`. |
+| [views.md](views.md)                         | `App` view router and every view module (welcome, connect, chat, task, settings, model sheet, shell).             |
+| [components.md](components.md)               | The design-system library — every component, its props, and behavior.                                             |
+| [design-system.md](design-system.md)         | Tailwind v4 setup, CSS design tokens, themes, type scale, animations, the irreducible CSS.                        |
+| [build-and-tooling.md](build-and-tooling.md) | WXT, scripts, TypeScript, ESLint, Prettier, CI workflows, repo config.                                            |
 
 ## Repository map
 

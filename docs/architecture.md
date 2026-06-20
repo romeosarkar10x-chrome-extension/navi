@@ -67,20 +67,20 @@ The whole run is cancellable: `App` holds an `AbortController` (Stop button / `h
 
 There is **no router and no global store.** Navigation and app state are plain React `useState`/`useRef` hooks inside `App` ([src/app.tsx](../src/app.tsx)):
 
-| State | Type | Purpose |
-| --- | --- | --- |
-| `view` | `ViewKey` | Which screen is shown. Acts as the router. |
-| `config` | `ProviderConfig` | `{ baseURL, model, apiKey }`. Loaded from / saved to storage. |
-| `agentSettings` | `AgentSettings` | `{ autoExecute, maxSteps }`. Loaded from / saved to storage. |
-| `sheet` | `boolean` | Whether the model-picker sheet is open. |
-| `messages` | `ChatTurn[]` | The chat transcript (messages + inline action cards). |
-| `draft` | `string` | Current composer text. |
-| `busy` | `boolean` | Whether an agent run is in flight. |
-| `activeTab` | `ActiveTab \| null` | The tab Navi is acting on (id/url/title). |
-| `attachPage` | `boolean` | Whether to send the page snapshot with the next message. |
-| `attachments` | `ElementAttachment[]` | Elements the user picked via the inspector. |
-| `picking` | `boolean` | Whether the element picker is active. |
-| `pendingApproval` | `ExecutableAction \| null` | The action awaiting the user's approve/skip. |
+| State             | Type                       | Purpose                                                       |
+| ----------------- | -------------------------- | ------------------------------------------------------------- |
+| `view`            | `ViewKey`                  | Which screen is shown. Acts as the router.                    |
+| `config`          | `ProviderConfig`           | `{ baseURL, model, apiKey }`. Loaded from / saved to storage. |
+| `agentSettings`   | `AgentSettings`            | `{ autoExecute, maxSteps }`. Loaded from / saved to storage.  |
+| `sheet`           | `boolean`                  | Whether the model-picker sheet is open.                       |
+| `messages`        | `ChatTurn[]`               | The chat transcript (messages + inline action cards).         |
+| `draft`           | `string`                   | Current composer text.                                        |
+| `busy`            | `boolean`                  | Whether an agent run is in flight.                            |
+| `activeTab`       | `ActiveTab \| null`        | The tab Navi is acting on (id/url/title).                     |
+| `attachPage`      | `boolean`                  | Whether to send the page snapshot with the next message.      |
+| `attachments`     | `ElementAttachment[]`      | Elements the user picked via the inspector.                   |
+| `picking`         | `boolean`                  | Whether the element picker is active.                         |
+| `pendingApproval` | `ExecutableAction \| null` | The action awaiting the user's approve/skip.                  |
 
 Refs back the async machinery: `abortRef` (cancel a run), `approvalRef` (resolve the approval promise), `pickerDisposeRef` (tear down the picker listener).
 

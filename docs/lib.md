@@ -18,8 +18,19 @@ cn.ts          ── classname joiner
 [src/lib/providers.ts](../src/lib/providers.ts)
 
 ```ts
-interface ProviderConfig { baseURL: string; model: string; apiKey: string }
-interface ProviderPreset { id; label; sub; icon: IconName; baseURL; model }
+interface ProviderConfig {
+    baseURL: string;
+    model: string;
+    apiKey: string;
+}
+interface ProviderPreset {
+    id;
+    label;
+    sub;
+    icon: IconName;
+    baseURL;
+    model;
+}
 ```
 
 - A provider is just an **OpenAI-compatible endpoint + model + (optional) key**. There is no "cloud vs local" enum anymore — every provider is the same shape.
@@ -34,12 +45,12 @@ interface ProviderPreset { id; label; sub; icon: IconName; baseURL; model }
 
 `createClient(config)` builds an `OpenAI` instance with `baseURL`, `apiKey` (falls back to `"not-needed"` so the SDK's auth header is non-empty for keyless servers), and `dangerouslyAllowBrowser: true` (required to run in the panel's browser context).
 
-| Export | Purpose |
-| --- | --- |
+| Export                                           | Purpose                                                                                                                                        |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `streamChat(config, messages, onToken, signal?)` | Streaming completion — calls `onToken` per delta, resolves with the full text. (Not currently used by the agent loop, which is non-streaming.) |
-| `chatComplete(config, messages, signal?)` | Non-streaming completion → full assistant text. Used by `runAgent`. |
-| `listModels(config, signal?)` | `GET /models` → sorted model IDs. Powers `ConnectView`'s model dropdown. Throws on failure. |
-| `testConnection(config)` | Minimal `max_tokens: 1` request to validate endpoint/model/key. Throws on failure. |
+| `chatComplete(config, messages, signal?)`        | Non-streaming completion → full assistant text. Used by `runAgent`.                                                                            |
+| `listModels(config, signal?)`                    | `GET /models` → sorted model IDs. Powers `ConnectView`'s model dropdown. Throws on failure.                                                    |
+| `testConnection(config)`                         | Minimal `max_tokens: 1` request to validate endpoint/model/key. Throws on failure.                                                             |
 
 All accept an `AbortSignal` so the UI can cancel in-flight requests.
 
@@ -48,6 +59,7 @@ All accept an `AbortSignal` so the UI can cancel in-flight requests.
 [src/lib/agent.ts](../src/lib/agent.ts) is the read-act-observe driver. It depends only on the lib layer and a set of callbacks/injected functions, so it has no React or DOM coupling.
 
 **Types:**
+
 - `ExecutableAction` — every `AgentAction` except `done` (i.e. `click` / `fill` / `select` / `scroll`).
 - `ActionPhase` — `"pending" | "running" | "success" | "failed"` (drives the action card status).
 - `AgentCallbacks` — `onThought?`, `onAction(action, phase, result?)`, `onAnswer(text)`.
@@ -66,8 +78,9 @@ All accept an `AbortSignal` so the UI can cancel in-flight requests.
 with an optional `"thought"` field. Read-only requests (summaries, "what can I click") are expected to answer with `done` on the first step.
 
 **Helpers:**
+
 - `snapshotToText(snapshot)` — serialize a `PageSnapshot` to the compact JSON handed to the model (`(no page access …)` when null).
-- `parseAction(raw)` — pull the first balanced top-level JSON object (handling ```` ```json ```` fences), parse it into a typed `AgentAction`, and fall back to a `done` answer carrying the raw text if there's no valid JSON.
+- `parseAction(raw)` — pull the first balanced top-level JSON object (handling ` ```json ` fences), parse it into a typed `AgentAction`, and fall back to a `done` answer carrying the raw text if there's no valid JSON.
 
 **`runAgent(opts)`** — seeds `[system, ...history, user]` (the user message bundles request + attachments + snapshot via `buildUserMessage`), then loops up to `maxSteps`:
 
@@ -86,11 +99,11 @@ Exhausting `maxSteps` emits a "reached the step limit" answer. Every iteration c
 
 **Types:** `DOMNode` (one pruned tree node — `ref`, `tag`, `role`, `text`, `href`, `type`, `label`, `value`, `placeholder`, `options`, `clickable`, `editable`, `children`), `PageSnapshot` (`url`, `title`, `selection`, `tree`, `truncated`), `AgentAction` (the union above), `ActionResult` (`{ ok, error? }`), `ElementAttachment` (`{ ref, descriptor, node }`), `ActiveTab` (`{ id, url, title }`).
 
-| Export | Purpose |
-| --- | --- |
-| `getActiveTab()` | The active tab in the current window, or `null`. |
-| `capturePage(tabId)` | Inject `captureFn`, return a `PageSnapshot`. Throws a friendly error on browser/extension/store pages. |
-| `runAction(tabId, action)` | Inject `actionFn` to perform one action, return an `ActionResult`. |
+| Export                     | Purpose                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `getActiveTab()`           | The active tab in the current window, or `null`.                                                       |
+| `capturePage(tabId)`       | Inject `captureFn`, return a `PageSnapshot`. Throws a friendly error on browser/extension/store pages. |
+| `runAction(tabId, action)` | Inject `actionFn` to perform one action, return an `ActionResult`.                                     |
 
 **`captureFn`** (injected) walks `document.body` building the pruned tree under caps (`MAX_NODES` 1200, `MAX_TEXT` 150, `MAX_JSON` 14000). It clears stale `data-navi-ref` stamps, skips invisible/structural nodes, detects clickable vs editable elements, assigns each interactive element a fresh numeric `ref` (mirrored to `data-navi-ref`), records inputs' type/value/placeholder, selects' options, and labels (aria/`<label>`/placeholder). Empty non-interactive wrappers are dropped and single-child passthroughs flattened. Sets `truncated` when caps are hit. Also captures the current text `selection`.
 

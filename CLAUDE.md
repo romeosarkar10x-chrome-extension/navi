@@ -21,15 +21,15 @@ Guidance for working in this repository.
 
 Run scripts with `pnpm run <script>` (not the `pnpm <script>` shorthand).
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm install` | Install deps; `postinstall` runs `wxt prepare` (generates `.wxt/`). |
-| `pnpm run dev` / `pnpm run dev:firefox` | Dev server. Does **not** auto-launch a browser — load `.output/` manually. |
-| `pnpm run build` / `pnpm run build:firefox` | Production build. |
-| `pnpm run zip` / `pnpm run zip:firefox` | Build + package a distributable zip. |
-| `pnpm run type-check` / `pnpm run compile` | `tsc` type-check (`compile` uses `--noEmit`). |
-| `pnpm run lint` | ESLint (needs the `unstable_native_nodejs_ts_config` flag). |
-| `pnpm run format` / `pnpm run format:check` | Prettier write / check. |
+| Command                                     | Purpose                                                                    |
+| ------------------------------------------- | -------------------------------------------------------------------------- |
+| `pnpm install`                              | Install deps; `postinstall` runs `wxt prepare` (generates `.wxt/`).        |
+| `pnpm run dev` / `pnpm run dev:firefox`     | Dev server. Does **not** auto-launch a browser — load `.output/` manually. |
+| `pnpm run build` / `pnpm run build:firefox` | Production build.                                                          |
+| `pnpm run zip` / `pnpm run zip:firefox`     | Build + package a distributable zip.                                       |
+| `pnpm run type-check` / `pnpm run compile`  | `tsc` type-check (`compile` uses `--noEmit`).                              |
+| `pnpm run lint`                             | ESLint (needs the `unstable_native_nodejs_ts_config` flag).                |
+| `pnpm run format` / `pnpm run format:check` | Prettier write / check.                                                    |
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on push to `main`, chaining reusable workflows **in order**: check-formatting → lint → type-check (each `needs` the previous). A `unit-test` job exists but is commented out (no tests yet).
 
@@ -91,7 +91,7 @@ navi/
 - **Package manager** — use `pnpm` only; always `pnpm run <script>`.
 - **Naming** — files are kebab-case. Identifiers follow TS casing (camelCase / PascalCase), and abbreviations are a single cased unit: `apiURL`, `userID`, `APIClient`, `HTTPRequest` — never `Api`, `Url`, `Id`.
 - **Git commits** — small, focused, one logical change each. Author Claude's commits as Claude using **per-command** flags (never change repo git config):
-  ```
-  git -c commit.gpgsign=false -c user.name="Claude" -c user.email="noreply@anthropic.com" commit -m "..."
-  ```
-  Disable GPG signing on Claude's commits via the `-c commit.gpgsign=false` flag above.
+    ```
+    git -c commit.gpgsign=false -c user.name="Claude" -c user.email="noreply@anthropic.com" commit -m "..."
+    ```
+    Disable GPG signing on Claude's commits via the `-c commit.gpgsign=false` flag above.

@@ -155,9 +155,9 @@ Files are grouped into four folders: **core**, **forms**, **feedback**, **chat**
 [components/chat/agent-action-card.tsx](../src/components/chat/agent-action-card.tsx) — inline card for one browser action the agent took. Extends `HTMLAttributes<HTMLDivElement>` minus `type`.
 
 - Exports the action vocabulary used by `ChatTurn`:
-  - `ActionType = "click" | "type" | "navigate" | "scrape" | "screenshot" | "fill" | "read"` (each maps to an icon).
-  - `ActionStatus = "pending" | "running" | "success" | "failed"` (each maps to an icon + color; `running` spins; `pending` circle, `success` check, `failed` ×).
-  - `ActionDetail = { k: ReactNode; v: ReactNode }`.
+    - `ActionType = "click" | "type" | "navigate" | "scrape" | "screenshot" | "fill" | "read"` (each maps to an icon).
+    - `ActionStatus = "pending" | "running" | "success" | "failed"` (each maps to an icon + color; `running` spins; `pending` circle, `success` check, `failed` ×).
+    - `ActionDetail = { k: ReactNode; v: ReactNode }`.
 - Props: `type` (default `click`), `label`, `status` (default `success`), `detail` (rows), `defaultOpen`. When `detail` is non-empty the card is an expand/collapse button (chevron rotates); detail rows render as monospace `k`/`v` pairs.
 
 ### ContextPill
