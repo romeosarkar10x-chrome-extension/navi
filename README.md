@@ -7,23 +7,22 @@ AI copilot that can chat with you, read and understand the current page, and tak
 actions on your behalf — forming a full agent loop. Think of it as a smart assistant that lives
 in your browser and can actually _do_ things, not just talk.
 
-Navi is designed to support multiple LLM providers:
+Navi talks to **any OpenAI-compatible chat endpoint** (via the [`openai`](https://www.npmjs.com/package/openai)
+SDK). A provider is just an endpoint + model + optional API key, so cloud services and self-hosted/local
+servers work the same way. Presets ship for a cloud and a self-hosted model, and you can switch or edit
+them from the model picker.
 
-- **Cloud** — Claude via the Anthropic API.
-- **Local** — local models via LM Studio's OpenAI-compatible endpoint on `localhost`.
-
-You can switch between providers from the model picker.
-
-> **Status:** The UI and design system are in place. The chat/agent flow currently runs against
-> simulated responses (see [`screens/app.tsx`](screens/app.tsx)) while the live provider
-> integrations are wired up.
+> **Status:** The chat/agent flow is **live** — Navi captures the active tab as a pruned DOM snapshot and
+> runs a real read-act-observe agent loop (see [`src/lib/agent.ts`](src/lib/agent.ts)) with optional
+> per-action approval. Provider config and agent settings persist to `browser.storage.local`. Full
+> reference in [`docs/`](docs/).
 
 ## Features
 
 - **See the page** — summarize, extract, and answer questions in the context of what you're looking at.
 - **Take action** — click, fill forms, and navigate one step at a time.
 - **You stay in control** — review every agent action before it runs.
-- **Multi-provider** — switch between cloud (Claude) and local models.
+- **Provider-agnostic** — point Navi at any OpenAI-compatible endpoint (cloud or self-hosted).
 
 ## Tech stack
 
@@ -73,23 +72,28 @@ Once loaded, click the Navi toolbar icon to open the side panel.
 
 ```
 navi/
-├─ entrypoints/         # Extension entrypoints
-│  ├─ background.ts      #   Service worker — opens the side panel on toolbar click
-│  ├─ content.ts         #   Content script injected into pages
-│  └─ sidepanel/         #   Side panel UI host (HTML + React root)
-├─ screens/             # Top-level views (welcome, chat, settings, task, …)
-├─ components/          # Design-system components, re-exported from components/index.ts
-│  ├─ core/              #   Buttons, icons, badges, cards, …
-│  ├─ forms/             #   Inputs, selects, switches, sliders, …
-│  ├─ feedback/          #   Toasts, banners, tooltips, status indicators
-│  └─ chat/              #   Chat messages, agent-action cards, step timelines
-├─ lib/                 # Shared utilities (e.g. cn.ts)
-├─ assets/              # Tailwind entry stylesheet
-├─ public/              # Static assets (extension icons)
-└─ wxt.config.ts        # WXT + manifest configuration
+├─ src/
+│  ├─ app.tsx           # Root component + view router + agent wiring
+│  ├─ types.ts          # ViewKey, ChatTurn
+│  ├─ entrypoints/      # Extension entrypoints
+│  │  ├─ background.ts   #   Service worker — opens the side panel on toolbar click
+│  │  ├─ content.ts      #   Content script (placeholder)
+│  │  └─ sidepanel/      #   Side panel UI host (index.html + index.tsx + index.css)
+│  ├─ lib/             # Non-UI core: providers, chat client, agent loop,
+│  │                   #   page bridge, element picker, storage, markdown, cn
+│  ├─ views/           # Top-level screens (welcome, connect, chat, settings, task)
+│  └─ components/      # Design-system components, re-exported from components/index.ts
+│     ├─ core/          #   Buttons, icons, badges, cards, …
+│     ├─ forms/         #   Inputs, selects, switches, sliders, …
+│     ├─ feedback/      #   Toasts, banners, tooltips, status indicators
+│     └─ chat/          #   Chat messages, markdown, agent-action cards, step timelines
+├─ public/             # Static assets (extension icons)
+├─ docs/               # In-depth documentation
+└─ wxt.config.ts       # WXT + manifest configuration
 ```
 
-The `@/` path alias maps to the project root (e.g. `@/components`, `@/screens/app`).
+The `@/` path alias maps to `src/` (e.g. `@/components/index`, `@/lib/agent`, `@/app`).
+See [`docs/`](docs/) for the full reference.
 
 ## License
 
