@@ -244,9 +244,32 @@ export function App() {
         let cardCounter = 0;
         let currentCardId = "";
         let streamId = "";
+        let thoughtId = "";
+        // Once a step's outcome (its action card or the final answer) appears, fold
+        // the thought that produced it away.
+        const collapseThought = () => {
+            if (thoughtId)
+                setMessages(m => m.map(x => (x.id === thoughtId ? { ...x, open: false, streamDone: true } : x)));
+        };
         const callbacks: AgentCallbacks = {
+            onThoughtStart: () => {
+                thoughtId = `tht-${Date.now()}-${cardCounter++}`;
+                setMessages(m => [
+                    ...m,
+                    { kind: "thought", id: thoughtId, text: "", streaming: true, streamDone: false, open: true },
+                ]);
+            },
+            onThoughtToken: delta => {
+                setMessages(m => m.map(x => (x.id === thoughtId ? { ...x, text: (x.text ?? "") + delta } : x)));
+            },
+            onThought: txt => {
+                if (thoughtId) setMessages(m => m.map(x => (x.id === thoughtId ? { ...x, text: txt } : x)));
+            },
             onAction: (action, phase, result) => {
-                if (phase === "pending") currentCardId = `act-${Date.now()}-${cardCounter++}`;
+                if (phase === "pending") {
+                    collapseThought();
+                    currentCardId = `act-${Date.now()}-${cardCounter++}`;
+                }
                 const id = currentCardId;
                 const card = actionCard(action, phase, id, result);
                 setMessages(m => {
@@ -258,6 +281,7 @@ export function App() {
                 });
             },
             onAnswerStart: () => {
+                collapseThought();
                 streamId = `ans-${Date.now()}-${cardCounter++}`;
                 setMessages(m => [
                     ...m,
@@ -310,10 +334,15 @@ export function App() {
             setBusy(false);
             abortRef.current = null;
             setPendingApproval(null);
-            // Stopped or aborted mid-stream: mark the stream ended so the typewriter
-            // drains its buffer and the caret clears.
-            if (streamId) setMessages(m => m.map(x => (x.id === streamId ? { ...x, streamDone: true } : x)));
+            // Stopped or aborted mid-stream: mark any live stream ended so the
+            // typewriter drains its buffer and the caret clears.
+            const ended = new Set([streamId, thoughtId].filter(Boolean));
+            if (ended.size) setMessages(m => m.map(x => (x.id && ended.has(x.id) ? { ...x, streamDone: true } : x)));
         }
+    }
+
+    function handleToggleThought(id: string) {
+        setMessages(m => m.map(x => (x.id === id ? { ...x, open: !x.open } : x)));
     }
 
     function handleStreamComplete(id: string) {
@@ -387,6 +416,7 @@ export function App() {
                 pendingApproval={pendingApproval}
                 onApprove={handleApprove}
                 onStreamComplete={handleStreamComplete}
+                onToggleThought={handleToggleThought}
             />
         );
     }

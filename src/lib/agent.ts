@@ -8,6 +8,11 @@ export type ExecutableAction = Exclude<AgentAction, { action: "done" }>;
 export type ActionPhase = "pending" | "running" | "success" | "failed";
 
 export interface AgentCallbacks {
+    /** A streamed thought is beginning for the current turn. */
+    onThoughtStart?: () => void;
+    /** A chunk of the streamed thought's text. */
+    onThoughtToken?: (delta: string) => void;
+    /** The current turn's thought, complete. */
     onThought?: (thought: string) => void;
     onAction: (action: ExecutableAction, phase: ActionPhase, result?: ActionResult) => void;
     /** A streamed final answer is beginning. */
@@ -173,15 +178,20 @@ function decodeJSONStringPrefix(s: string, start: number): string {
 }
 
 /**
- * Best-effort live extraction of the `text` field of a `done` action from a
- * partially-streamed JSON reply. Returns the decoded text so far once both the
- * `done` action and the `text` key have appeared, otherwise `null`.
+ * Best-effort live extraction of a top-level string field's value from a
+ * partially-streamed JSON reply. Returns the decoded value so far once the
+ * field's opening quote has appeared, otherwise `null`.
  */
-function extractDoneText(raw: string): string | null {
-    if (!/"action"\s*:\s*"done"/.test(raw)) return null;
-    const m = /"text"\s*:\s*"/.exec(raw);
+function extractStringField(raw: string, key: string): string | null {
+    const m = new RegExp(`"${key}"\\s*:\\s*"`).exec(raw);
     if (!m) return null;
     return decodeJSONStringPrefix(raw, m.index + m[0].length);
+}
+
+/** The `text` of a `done` action — only once the action is confirmed `done`. */
+function extractDoneText(raw: string): string | null {
+    if (!/"action"\s*:\s*"done"/.test(raw)) return null;
+    return extractStringField(raw, "text");
 }
 
 function observation(result: ActionResult, snapshot: PageSnapshot | null): string {
@@ -209,23 +219,40 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
         // Stream the turn so a final `done` answer can be revealed token-by-token
         // as it arrives, even though it's embedded in the JSON action envelope.
         let raw = "";
+        let thoughtStarted = false;
+        let thoughtEmitted = "";
         let answerStarted = false;
-        let emitted = "";
+        let answerEmitted = "";
         try {
             await streamChat(
                 config,
                 messages,
                 delta => {
                     raw += delta;
+
+                    // The thought streams first; surface it live as it arrives.
+                    const thought = extractStringField(raw, "thought");
+                    if (thought != null) {
+                        if (!thoughtStarted) {
+                            thoughtStarted = true;
+                            callbacks.onThoughtStart?.();
+                        }
+                        if (thought.length > thoughtEmitted.length) {
+                            callbacks.onThoughtToken?.(thought.slice(thoughtEmitted.length));
+                            thoughtEmitted = thought;
+                        }
+                    }
+
+                    // Then, on a `done` turn, the answer text.
                     const text = extractDoneText(raw);
                     if (text == null) return;
                     if (!answerStarted) {
                         answerStarted = true;
                         callbacks.onAnswerStart?.();
                     }
-                    if (text.length > emitted.length) {
-                        callbacks.onAnswerToken?.(text.slice(emitted.length));
-                        emitted = text;
+                    if (text.length > answerEmitted.length) {
+                        callbacks.onAnswerToken?.(text.slice(answerEmitted.length));
+                        answerEmitted = text;
                     }
                 },
                 signal,

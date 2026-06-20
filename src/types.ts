@@ -3,10 +3,10 @@ import type { ActionDetail, ActionStatus, ActionType } from "@/components/index"
 
 export type ViewKey = "welcome" | "connect" | "chat" | "settings" | "task" | "history" | "recipes";
 
-/** A chat turn — either a rendered message or an inline agent-action card. */
+/** A chat turn — a rendered message, an inline agent-action card, or a thinking block. */
 export interface ChatTurn {
-    kind?: "action";
-    /** Stable id for action cards so their status can be updated in place. */
+    kind?: "action" | "thought";
+    /** Stable id for action/thought cards so they can be updated in place. */
     id?: string;
     role?: "user" | "assistant";
     meta?: ReactNode;

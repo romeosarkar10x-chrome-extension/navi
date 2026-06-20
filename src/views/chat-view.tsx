@@ -7,9 +7,10 @@ import {
     Icon,
     Markdown,
     PromptInput,
-    QuickActions,
+    // QuickActions,
     StreamingIndicator,
     StreamingMarkdown,
+    ThinkingBlock,
 } from "@/components/index";
 import { cn } from "@/lib/cn";
 import type { ActiveTab, ElementAttachment } from "@/lib/page-bridge";
@@ -60,6 +61,7 @@ export interface ChatViewProps {
     pendingApproval: ExecutableAction | null;
     onApprove: (approved: boolean) => void;
     onStreamComplete: (id: string) => void;
+    onToggleThought: (id: string) => void;
 }
 
 export function ChatView({
@@ -81,6 +83,7 @@ export function ChatView({
     pendingApproval,
     onApprove,
     onStreamComplete,
+    onToggleThought,
 }: ChatViewProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -119,6 +122,16 @@ export function ChatView({
                             status={m.status}
                             detail={m.detail}
                             defaultOpen={m.open}
+                        />
+                    ) : m.kind === "thought" ? (
+                        <ThinkingBlock
+                            key={i}
+                            text={m.text ?? ""}
+                            streaming={m.streaming}
+                            streamDone={m.streamDone}
+                            open={m.open}
+                            onToggle={() => m.id && onToggleThought(m.id)}
+                            onComplete={() => m.id && onStreamComplete(m.id)}
                         />
                     ) : (
                         <ChatMessage
@@ -219,7 +232,7 @@ export function ChatView({
                     )}
                 </div>
 
-                <QuickActions
+                {/*<QuickActions
                     actions={[
                         { icon: "scan-text", label: "Summarize page", onClick: () => onSend("Summarize this page") },
                         {
@@ -234,7 +247,7 @@ export function ChatView({
                                 onSend("What are the main things I can click or interact with on this page?"),
                         },
                     ]}
-                />
+                />*/}
                 <PromptInput
                     value={draft}
                     onChange={setDraft}
