@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 
 export interface StreamingIndicatorProps extends HTMLAttributes<HTMLSpanElement> {
     label?: ReactNode;

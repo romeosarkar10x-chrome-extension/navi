@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 
 const BUBBLE_BASE =
     "absolute z-50 left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none " +

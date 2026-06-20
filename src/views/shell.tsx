@@ -1,4 +1,4 @@
-import { IconButton, Tooltip } from "@/src/components";
+import { IconButton, Tooltip } from "@/components/index";
 import type { ViewKey } from "../types";
 
 export function NaviLogo({ size = 20 }: { size?: number }) {

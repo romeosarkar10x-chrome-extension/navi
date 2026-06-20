@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 
 const BASE =
     "inline-flex items-center justify-center min-w-[18px] h-[18px] px-[5px] font-mono text-2xs " +

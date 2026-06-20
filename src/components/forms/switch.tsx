@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 
 const BASE =
     "relative inline-flex items-center w-[36px] h-[20px] rounded-full p-[2px] border cursor-pointer flex-none " +

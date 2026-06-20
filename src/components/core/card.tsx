@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 
 const BASE = "bg-surface-card border border-line rounded-lg transition duration-[120ms] ease-[var(--ease-out)]";
 

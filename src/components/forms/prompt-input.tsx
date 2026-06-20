@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 import { Icon } from "../core/icon";
 import { IconButton } from "../core/icon-button";
 

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { APIKeyInput, Button, Icon, Input, Select, Slider, Switch } from "@/src/components";
-import { matchPreset, PRESETS, type ProviderConfig, type ProviderPreset } from "@/src/lib/providers";
-import type { AgentSettings } from "@/src/lib/storage";
+import { APIKeyInput, Button, Icon, Input, Select, Slider, Switch } from "@/components/index";
+import { matchPreset, PRESETS, type ProviderConfig, type ProviderPreset } from "@/lib/providers";
+import type { AgentSettings } from "@/lib/storage";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
     return (

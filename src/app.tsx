@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Icon, type ActionDetail, type ActionStatus, type ActionType, type IconName } from "@/src/components";
-import { cn } from "@/src/lib/cn";
-import { DEFAULT_CONFIG, type ProviderConfig } from "@/src/lib/providers";
+import { Button, Icon, type ActionDetail, type ActionStatus, type ActionType, type IconName } from "@/components/index";
+import { cn } from "@/lib/cn";
+import { DEFAULT_CONFIG, type ProviderConfig } from "@/lib/providers";
 import {
     DEFAULT_AGENT_SETTINGS,
     loadAgentSettings,
@@ -9,9 +9,9 @@ import {
     saveAgentSettings,
     saveConfig,
     type AgentSettings,
-} from "@/src/lib/storage";
-import type { ChatMessage } from "@/src/lib/chat-client";
-import { runAgent, type ActionPhase, type AgentCallbacks, type ExecutableAction } from "@/src/lib/agent";
+} from "@/lib/storage";
+import type { ChatMessage } from "@/lib/chat-client";
+import { runAgent, type ActionPhase, type AgentCallbacks, type ExecutableAction } from "@/lib/agent";
 import {
     capturePage,
     getActiveTab,
@@ -20,12 +20,14 @@ import {
     type ActiveTab,
     type ElementAttachment,
     type PageSnapshot,
-} from "@/src/lib/page-bridge";
-import { startPicker, stopPicker } from "@/src/lib/element-picker";
+} from "@/lib/page-bridge";
+import { startPicker, stopPicker } from "@/lib/element-picker";
 import { TopBar } from "./views/shell";
-import { WelcomeView, ConnectView } from "./views/welcome";
-import { ChatView, TaskView } from "./views/chat";
-import { SettingsView, ModelSheet } from "./views/settings";
+import { WelcomeView } from "./views/welcome-view";
+import { ConnectView } from "./views/connect-view";
+import { ChatView } from "./views/chat-view";
+import { TaskView } from "./views/task-view";
+import { SettingsView, ModelSheet } from "./views/settings-view";
 import type { ChatTurn, ViewKey } from "./types";
 
 const GREETING: ChatTurn[] = [

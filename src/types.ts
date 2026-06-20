@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { ActionDetail, ActionStatus, ActionType } from "@/src/components";
+import type { ActionDetail, ActionStatus, ActionType } from "@/components/index";
 
 export type ViewKey = "welcome" | "connect" | "chat" | "settings" | "task" | "history" | "recipes";
 

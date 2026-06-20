@@ -1,5 +1,5 @@
 import type { ChangeEventHandler, HTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "../core/icon";
 
 type Size = "sm" | "md" | "lg";

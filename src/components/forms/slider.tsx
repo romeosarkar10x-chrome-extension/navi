@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 
 export interface SliderProps extends Omit<
     InputHTMLAttributes<HTMLInputElement>,

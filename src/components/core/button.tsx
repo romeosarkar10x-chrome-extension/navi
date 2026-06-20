@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "./icon";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";

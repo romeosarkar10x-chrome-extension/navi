@@ -1,4 +1,4 @@
-import type { IconName } from "@/src/components";
+import type { IconName } from "@/components/index";
 
 /** A fully-resolved connection to an OpenAI-compatible chat endpoint. */
 export interface ProviderConfig {

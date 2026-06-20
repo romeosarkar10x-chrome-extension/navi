@@ -1,5 +1,5 @@
 import type { HTMLAttributes } from "react";
-import { cn } from "@/src/lib/cn";
+import { cn } from "@/lib/cn";
 import { Icon, type IconName } from "./icon";
 
 type Tone = "neutral" | "accent" | "success" | "progress" | "error" | "solid";
