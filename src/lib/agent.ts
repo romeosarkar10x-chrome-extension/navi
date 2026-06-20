@@ -1,5 +1,5 @@
 import type { ProviderConfig } from "./providers";
-import { chatComplete, type ChatMessage } from "./chat-client";
+import { streamChat, type ChatMessage } from "./chat-client";
 import type { ActionResult, AgentAction, ElementAttachment, PageSnapshot } from "./page-bridge";
 
 /** Any action the agent performs on the page (everything except finishing). */
@@ -10,6 +10,11 @@ export type ActionPhase = "pending" | "running" | "success" | "failed";
 export interface AgentCallbacks {
     onThought?: (thought: string) => void;
     onAction: (action: ExecutableAction, phase: ActionPhase, result?: ActionResult) => void;
+    /** A streamed final answer is beginning. */
+    onAnswerStart?: () => void;
+    /** A chunk of the streamed final answer's text. */
+    onAnswerToken?: (delta: string) => void;
+    /** The final answer, complete. Always fires (even when streaming wasn't used). */
     onAnswer: (text: string) => void;
 }
 
@@ -123,6 +128,60 @@ export function parseAction(raw: string): { thought?: string; action: AgentActio
     }
 }
 
+const JSON_ESCAPES: Record<string, string> = {
+    "n": "\n",
+    "t": "\t",
+    "r": "\r",
+    "b": "\b",
+    "f": "\f",
+    "/": "/",
+    '"': '"',
+    "\\": "\\",
+};
+
+/**
+ * Decode a JSON string value starting at `start` (just past the opening quote)
+ * up to the closing quote or the end of the available text. Stops cleanly on an
+ * incomplete trailing escape so the decoded prefix only ever grows as more text
+ * streams in.
+ */
+function decodeJSONStringPrefix(s: string, start: number): string {
+    let out = "";
+    let i = start;
+    while (i < s.length) {
+        const c = s[i];
+        if (c === '"') break;
+        if (c === "\\") {
+            if (i + 1 >= s.length) break; // dangling backslash — wait for more
+            const e = s[i + 1];
+            if (e === "u") {
+                if (i + 6 > s.length) break; // incomplete \uXXXX — wait for more
+                out += String.fromCharCode(parseInt(s.slice(i + 2, i + 6), 16) || 0);
+                i += 6;
+                continue;
+            }
+            out += JSON_ESCAPES[e] ?? e;
+            i += 2;
+            continue;
+        }
+        out += c;
+        i++;
+    }
+    return out;
+}
+
+/**
+ * Best-effort live extraction of the `text` field of a `done` action from a
+ * partially-streamed JSON reply. Returns the decoded text so far once both the
+ * `done` action and the `text` key have appeared, otherwise `null`.
+ */
+function extractDoneText(raw: string): string | null {
+    if (!/"action"\s*:\s*"done"/.test(raw)) return null;
+    const m = /"text"\s*:\s*"/.exec(raw);
+    if (!m) return null;
+    return decodeJSONStringPrefix(raw, m.index + m[0].length);
+}
+
 function observation(result: ActionResult, snapshot: PageSnapshot | null): string {
     const status = result.ok ? "Action succeeded." : `Action failed: ${result.error ?? "unknown error"}.`;
     return `${status}\n\nUpdated page snapshot:\n${snapshotToText(snapshot)}`;
@@ -145,9 +204,30 @@ export async function runAgent(opts: RunAgentOptions): Promise<void> {
     for (let step = 0; step < maxSteps; step++) {
         if (signal.aborted) return;
 
-        let raw: string;
+        // Stream the turn so a final `done` answer can be revealed token-by-token
+        // as it arrives, even though it's embedded in the JSON action envelope.
+        let raw = "";
+        let answerStarted = false;
+        let emitted = "";
         try {
-            raw = await chatComplete(config, messages, signal);
+            await streamChat(
+                config,
+                messages,
+                delta => {
+                    raw += delta;
+                    const text = extractDoneText(raw);
+                    if (text == null) return;
+                    if (!answerStarted) {
+                        answerStarted = true;
+                        callbacks.onAnswerStart?.();
+                    }
+                    if (text.length > emitted.length) {
+                        callbacks.onAnswerToken?.(text.slice(emitted.length));
+                        emitted = text;
+                    }
+                },
+                signal,
+            );
         } catch (err) {
             if (signal.aborted) return;
             callbacks.onAnswer(`⚠️ ${err instanceof Error ? err.message : "Request failed"}`);
