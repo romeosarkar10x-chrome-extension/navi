@@ -9,6 +9,7 @@ import {
     PromptInput,
     QuickActions,
     StreamingIndicator,
+    StreamingMarkdown,
 } from "@/components/index";
 import { cn } from "@/lib/cn";
 import type { ActiveTab, ElementAttachment } from "@/lib/page-bridge";
@@ -58,6 +59,7 @@ export interface ChatViewProps {
     onTogglePicker: () => void;
     pendingApproval: ExecutableAction | null;
     onApprove: (approved: boolean) => void;
+    onStreamComplete: (id: string) => void;
 }
 
 export function ChatView({
@@ -78,12 +80,30 @@ export function ChatView({
     onTogglePicker,
     pendingApproval,
     onApprove,
+    onStreamComplete,
 }: ChatViewProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const el = scrollRef.current;
         if (el) el.scrollTop = el.scrollHeight;
     }, [messages, busy]);
+
+    const streamingNow = messages.some(m => m.streaming);
+
+    // Follow the typewriter as it reveals text between token arrivals, but only
+    // while the user is parked near the bottom — don't yank them back if they
+    // scrolled up to read.
+    useEffect(() => {
+        if (!streamingNow) return;
+        let raf = 0;
+        const pin = () => {
+            const el = scrollRef.current;
+            if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 80) el.scrollTop = el.scrollHeight;
+            raf = requestAnimationFrame(pin);
+        };
+        raf = requestAnimationFrame(pin);
+        return () => cancelAnimationFrame(raf);
+    }, [streamingNow]);
 
     return (
         <div className="flex-1 min-h-0 flex flex-col">
@@ -106,11 +126,21 @@ export function ChatView({
                             role={m.role}
                             meta={m.meta}
                             initials="JD">
-                            {m.role === "assistant" && m.text != null ? <Markdown source={m.text} /> : m.body}
+                            {m.role === "assistant" && m.streaming ? (
+                                <StreamingMarkdown
+                                    text={m.text ?? ""}
+                                    done={!!m.streamDone}
+                                    onComplete={() => m.id && onStreamComplete(m.id)}
+                                />
+                            ) : m.role === "assistant" && m.text != null ? (
+                                <Markdown source={m.text} />
+                            ) : (
+                                m.body
+                            )}
                         </ChatMessage>
                     ),
                 )}
-                {busy && !pendingApproval && (
+                {busy && !pendingApproval && !streamingNow && (
                     <div className="py-[2px] px-1">
                         <StreamingIndicator label="Navi is working…" />
                     </div>

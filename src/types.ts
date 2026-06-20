@@ -13,6 +13,10 @@ export interface ChatTurn {
     body?: ReactNode;
     /** Plain-text version of `body`, used to build the model's conversation history. */
     text?: string;
+    /** Render `text` through the typewriter (a live or just-finished streamed answer). */
+    streaming?: boolean;
+    /** The underlying token stream has ended; the typewriter drains the remaining buffer. */
+    streamDone?: boolean;
     // action-card fields (when kind === "action")
     type?: ActionType;
     label?: ReactNode;

@@ -237,6 +237,7 @@ export function App() {
 
         let cardCounter = 0;
         let currentCardId = "";
+        let streamId = "";
         const callbacks: AgentCallbacks = {
             onAction: (action, phase, result) => {
                 if (phase === "pending") currentCardId = `act-${Date.now()}-${cardCounter++}`;
@@ -250,8 +251,29 @@ export function App() {
                     return copy;
                 });
             },
+            onAnswerStart: () => {
+                streamId = `ans-${Date.now()}-${cardCounter++}`;
+                setMessages(m => [
+                    ...m,
+                    {
+                        id: streamId,
+                        role: "assistant",
+                        meta: config.model,
+                        text: "",
+                        streaming: true,
+                        streamDone: false,
+                    },
+                ]);
+            },
+            onAnswerToken: delta => {
+                setMessages(m => m.map(x => (x.id === streamId ? { ...x, text: (x.text ?? "") + delta } : x)));
+            },
             onAnswer: txt => {
-                setMessages(m => [...m, { role: "assistant", meta: config.model, body: txt, text: txt }]);
+                if (streamId) {
+                    setMessages(m => m.map(x => (x.id === streamId ? { ...x, text: txt, streamDone: true } : x)));
+                } else {
+                    setMessages(m => [...m, { role: "assistant", meta: config.model, body: txt, text: txt }]);
+                }
             },
         };
 
@@ -282,7 +304,14 @@ export function App() {
             setBusy(false);
             abortRef.current = null;
             setPendingApproval(null);
+            // Stopped or aborted mid-stream: mark the stream ended so the typewriter
+            // drains its buffer and the caret clears.
+            if (streamId) setMessages(m => m.map(x => (x.id === streamId ? { ...x, streamDone: true } : x)));
         }
+    }
+
+    function handleStreamComplete(id: string) {
+        setMessages(m => m.map(x => (x.id === id ? { ...x, streaming: false } : x)));
     }
 
     let main: ReactNode;
@@ -345,6 +374,7 @@ export function App() {
                 onTogglePicker={togglePicker}
                 pendingApproval={pendingApproval}
                 onApprove={handleApprove}
+                onStreamComplete={handleStreamComplete}
             />
         );
     }
