@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APIKeyInput, Banner, Button, Dropdown, Icon, Input, StatusDot } from "@/components/index";
-import { isConfigReady, matchPreset, PRESETS, type ProviderConfig, type ProviderPreset } from "@/lib/providers";
+import { isConfigReady, matchPreset, PRESETS, type ProviderConfig, type ProviderPreset } from "@/lib/agent/providers";
 import { listModels, testConnection } from "@/lib/chat-client";
 
 type TestState = "idle" | "testing" | "ok" | "error";

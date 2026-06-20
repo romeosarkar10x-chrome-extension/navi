@@ -1,5 +1,5 @@
 import { Button, Icon } from "@/components/index";
-import { PRESETS, ProviderPreset } from "@/lib/providers";
+import { PRESETS, ProviderPreset } from "@/lib/agent/providers";
 import { IconName } from "@/components/index";
 
 const POINTS: { icon: IconName; t: string; d: string }[] = [

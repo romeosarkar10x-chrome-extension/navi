@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import { DEFAULT_CONFIG, type ProviderConfig } from "./providers";
+import { DEFAULT_CONFIG, type ProviderConfig } from "./agent/providers";
 
 const CONFIG_KEY = "navi:provider-config";
 const AGENT_KEY = "navi:agent-settings";

@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { ProviderConfig } from "./providers";
+import type { ProviderConfig } from "./agent/providers";
 
 /** A plain-text chat turn sent to the model — distinct from the UI's ChatTurn. */
 export interface ChatMessage {

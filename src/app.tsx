@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Icon, type ActionDetail, type ActionStatus, type ActionType, type IconName } from "@/components/index";
 import { cn } from "@/lib/cn";
-import { DEFAULT_CONFIG, isConfigReady, type ProviderConfig } from "@/lib/providers";
+import { DEFAULT_CONFIG, isConfigReady, type ProviderConfig } from "@/lib/agent/providers";
 import {
     DEFAULT_AGENT_SETTINGS,
     loadAgentSettings,
@@ -20,7 +20,7 @@ import {
     type ActiveTab,
     type ElementAttachment,
     type PageSnapshot,
-} from "@/lib/page-bridge";
+} from "@/lib/agent/page-bridge";
 import { startPicker, stopPicker } from "@/lib/element-picker";
 import { TopBar } from "./views/shell";
 import { WelcomeView } from "./views/welcome-view";
@@ -34,6 +34,7 @@ const GREETING: ChatTurn[] = [
     {
         role: "assistant",
         meta: "navi",
+        kind: "message",
         body: (
             <span>
                 Hey! I can see the current tab. Ask me to summarize it, pull data into a table, or act on it — click a
@@ -76,7 +77,7 @@ function actionCard(action: ExecutableAction, phase: ActionPhase, id: string, re
     if (action.action === "fill" || action.action === "select") detail.push({ k: "value", v: action.value });
     if (result?.error && result.error !== "skipped") detail.push({ k: "error", v: result.error });
     return {
-        kind: "action",
+        kind: "tool_call",
         id,
         type: ACTION_TYPE[action.action],
         label: actionLabel(action),
@@ -209,14 +210,14 @@ export function App() {
         setDraft("");
 
         const history: ChatMessage[] = messages
-            .filter(m => m.kind !== "action" && (m.role === "user" || m.role === "assistant"))
+            .filter(m => m.kind !== "tool_call" && (m.role === "user" || m.role === "assistant"))
             .map(m => ({
                 role: m.role as "user" | "assistant",
                 content: m.text ?? (typeof m.body === "string" ? m.body : ""),
             }))
             .filter(m => m.content.length > 0);
 
-        setMessages(m => [...m, { role: "user", body: t, text: t }]);
+        setMessages(m => [...m, { role: "user", kind: "message", body: t, text: t }]);
         setBusy(true);
 
         const controller = new AbortController();
@@ -233,6 +234,7 @@ export function App() {
                 setMessages(m => [
                     ...m,
                     {
+                        kind: "message",
                         role: "assistant",
                         meta: "note",
                         body: `⚠️ ${err instanceof Error ? err.message : "Couldn't read the page"}`,
@@ -290,6 +292,7 @@ export function App() {
                         role: "assistant",
                         meta: config.model,
                         text: "",
+                        kind: "message",
                         streaming: true,
                         streamDone: false,
                     },
@@ -302,7 +305,10 @@ export function App() {
                 if (streamId) {
                     setMessages(m => m.map(x => (x.id === streamId ? { ...x, text: txt, streamDone: true } : x)));
                 } else {
-                    setMessages(m => [...m, { role: "assistant", meta: config.model, body: txt, text: txt }]);
+                    setMessages(m => [
+                        ...m,
+                        { role: "assistant", kind: "message", meta: config.model, body: txt, text: txt },
+                    ]);
                 }
             },
         };

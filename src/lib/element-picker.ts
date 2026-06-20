@@ -1,5 +1,5 @@
 import { browser } from "wxt/browser";
-import type { ElementAttachment } from "./page-bridge";
+import type { ElementAttachment } from "./agent/page-bridge";
 
 /**
  * Turn on the devtools-style element picker in the given tab. Each element the

@@ -1,5 +1,5 @@
 import type { ProviderConfig } from "./providers";
-import { streamChat, type ChatMessage } from "./chat-client";
+import { streamChat, type ChatMessage } from "../chat-client";
 import type { ActionResult, AgentAction, ElementAttachment, PageSnapshot } from "./page-bridge";
 
 /** Any action the agent performs on the page (everything except finishing). */

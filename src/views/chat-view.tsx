@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Button, ContextPill, Icon, PromptInput } from "@/components/index";
 import { cn } from "@/lib/cn";
-import type { ActiveTab, ElementAttachment } from "@/lib/page-bridge";
+import type { ActiveTab, ElementAttachment } from "@/lib/agent/page-bridge";
 import type { ExecutableAction } from "@/lib/agent";
 import type { ChatTurn } from "../types";
 import { Messages } from "@/components/chat/messages";

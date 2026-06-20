@@ -23,49 +23,56 @@ export function Messages({
         <div
             ref={scrollRef}
             className="flex-1 min-h-0 overflow-y-auto py-4 px-[14px] flex flex-col gap-[14px] navi-scroll">
-            {messages.map((m, i) =>
-                m.kind === "action" ? (
-                    <AgentActionCard
-                        key={i}
-                        type={m.type}
-                        label={m.label}
-                        status={m.status}
-                        detail={m.detail}
-                        defaultOpen={m.open}
-                    />
-                ) : m.kind === "thought" ? (
-                    <ThinkingBlock
-                        key={i}
-                        text={m.text ?? ""}
-                        streaming={m.streaming}
-                        streamDone={m.streamDone}
-                        open={m.open}
-                        onToggle={() => m.id && onToggleThought(m.id)}
-                        onComplete={() => m.id && onStreamComplete(m.id)}
-                    />
-                ) : (
-                    <ChatMessage
-                        key={i}
-                        role={m.role}
-                        meta={m.meta}
-                        initials="JD">
-                        {m.role === "assistant" && m.streaming ? (
-                            <StreamingMarkdown
-                                text={m.text ?? ""}
-                                done={!!m.streamDone}
-                                onComplete={() => m.id && onStreamComplete(m.id)}
+            {messages.map((message, i) => {
+                switch (message.kind) {
+                    case "message":
+                        return (
+                            <ChatMessage
+                                key={i}
+                                role={message.role}
+                                meta={message.meta}
+                                initials="JD">
+                                {message.role === "assistant" && message.streaming ? (
+                                    <StreamingMarkdown
+                                        text={message.text ?? ""}
+                                        done={!!message.streamDone}
+                                        onComplete={() => message.id && onStreamComplete(message.id)}
+                                    />
+                                ) : message.role === "assistant" && message.text != null ? (
+                                    <Markdown source={message.text} />
+                                ) : (
+                                    message.body
+                                )}
+                            </ChatMessage>
+                        );
+
+                    case "thought":
+                        return (
+                            <ThinkingBlock
+                                key={i}
+                                text={message.text ?? ""}
+                                streaming={message.streaming}
+                                streamDone={message.streamDone}
+                                open={message.open}
+                                onToggle={() => message.id && onToggleThought(message.id)}
+                                onComplete={() => message.id && onStreamComplete(message.id)}
                             />
-                        ) : m.role === "assistant" && m.text != null ? (
-                            <Markdown source={m.text} />
-                        ) : (
-                            m.body
-                        )}
-                    </ChatMessage>
-                ),
-            )}
+                        );
+
+                    case "tool_call":
+                        <AgentActionCard
+                            key={i}
+                            type={message.type}
+                            label={message.label}
+                            status={message.status}
+                            detail={message.detail}
+                            defaultOpen={message.open}
+                        />;
+                }
+            })}
             {busy && !pendingApproval && !streamingNow && (
                 <div className="py-[2px] px-1">
-                    <StreamingIndicator label="Navi is working…" />
+                    <StreamingIndicator label="Navi is working..." />
                 </div>
             )}
         </div>
