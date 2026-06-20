@@ -43,6 +43,8 @@ export function useTypewriter(target: string, options: TypewriterOptions = {}): 
 
     // When the target diverges from what we've already shown (a brand-new message,
     // or a finalize that rewrites the text), restart the reveal from the divergence.
+    // This runs per token but only does work on a true divergence, so it never
+    // disturbs the animation loop below.
     useEffect(() => {
         const prev = prevTargetRef.current;
         prevTargetRef.current = target;
@@ -56,33 +58,35 @@ export function useTypewriter(target: string, options: TypewriterOptions = {}): 
         }
     }, [target]);
 
+    // A single, persistent reveal loop. It must NOT depend on `target`: restarting
+    // it on every streamed token would reset the frame clock and starve the reveal,
+    // so the text would only appear once streaming stops. Instead it reads the
+    // latest target from a ref and runs continuously while mounted.
     useEffect(() => {
         if (!animate || prefersReducedMotion()) {
-            countRef.current = target.length;
-            setCount(target.length);
+            countRef.current = targetRef.current.length;
+            setCount(targetRef.current.length);
             return;
         }
 
         let raf = 0;
         let last = 0;
         const tick = (ts: number) => {
-            if (!last) last = ts;
-            const dt = Math.min(0.25, (ts - last) / 1000);
+            const dt = last ? Math.min(0.1, (ts - last) / 1000) : 0;
             last = ts;
 
             const total = targetRef.current.length;
-            const backlog = total - countRef.current;
-            if (backlog <= 0) return; // caught up — stop until `target` grows again
-
-            const rate = clamp(backlog / drainSeconds, minCharsPerSecond, maxCharsPerSecond);
-            countRef.current = Math.min(total, countRef.current + rate * dt);
-            setCount(Math.floor(countRef.current));
+            if (countRef.current < total) {
+                const backlog = total - countRef.current;
+                const rate = clamp(backlog / drainSeconds, minCharsPerSecond, maxCharsPerSecond);
+                countRef.current = Math.min(total, countRef.current + rate * dt);
+                setCount(Math.floor(countRef.current));
+            }
             raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-        // Re-runs whenever `target` grows, restarting the drain loop.
-    }, [target, animate, minCharsPerSecond, maxCharsPerSecond, drainSeconds]);
+    }, [animate, minCharsPerSecond, maxCharsPerSecond, drainSeconds]);
 
     return target.slice(0, count);
 }
