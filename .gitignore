@@ -25,3 +25,6 @@ web-ext.config.ts
 
 
 /tmp
+
+/.env*
+!/.env.example
