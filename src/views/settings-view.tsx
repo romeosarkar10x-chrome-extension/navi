@@ -190,10 +190,11 @@ export function SettingsView({
 export interface ModelSheetProps {
     currentModel: string;
     onPick: (preset: ProviderPreset) => void;
+    onConnectNew: () => void;
     onClose: () => void;
 }
 
-export function ModelSheet({ currentModel, onPick, onClose }: ModelSheetProps) {
+export function ModelSheet({ currentModel, onPick, onConnectNew, onClose }: ModelSheetProps) {
     return (
         <div
             onClick={onClose}
@@ -232,6 +233,25 @@ export function ModelSheet({ currentModel, onPick, onClose }: ModelSheetProps) {
                         </button>
                     );
                 })}
+                <div className="mt-1 pt-2 border-t border-line">
+                    <button
+                        type="button"
+                        onClick={onConnectNew}
+                        className="flex items-center gap-[11px] w-full p-[10px] border-none rounded-md cursor-pointer text-left text-inherit bg-transparent hover:bg-control transition duration-[120ms] ease-[var(--ease-out)]">
+                        <span className="w-[30px] h-[30px] flex-none rounded-sm bg-surface-raised flex items-center justify-center text-accent-text">
+                            <Icon
+                                name="plug-zap"
+                                size={15}
+                            />
+                        </span>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-base font-medium text-strong">Connect a different model…</div>
+                            <div className="text-2xs text-muted font-mono mt-[1px]">
+                                Enter an endpoint and pick from its models
+                            </div>
+                        </div>
+                    </button>
+                </div>
             </div>
         </div>
     );

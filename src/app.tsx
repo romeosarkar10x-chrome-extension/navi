@@ -340,7 +340,7 @@ export function App() {
         main = (
             <ConnectView
                 initialConfig={config}
-                onBack={() => setView("welcome")}
+                onBack={() => setView(isConfigReady(config) ? "chat" : "welcome")}
                 onDone={cfg => {
                     persistConfig(cfg);
                     setView("chat");
@@ -412,6 +412,10 @@ export function App() {
                     onPick={preset => {
                         persistConfig({ ...config, baseURL: preset.baseURL, model: preset.model });
                         setSheet(false);
+                    }}
+                    onConnectNew={() => {
+                        setSheet(false);
+                        setView("connect");
                     }}
                 />
             )}
