@@ -22,6 +22,7 @@ export { Tooltip, type TooltipProps } from "./feedback/tooltip";
 
 export { ChatMessage, type ChatMessageProps } from "./chat/chat-message";
 export { Markdown, type MarkdownProps } from "./chat/markdown";
+export { StreamingMarkdown, type StreamingMarkdownProps } from "./chat/streaming-markdown";
 export {
     AgentActionCard,
     type AgentActionCardProps,
