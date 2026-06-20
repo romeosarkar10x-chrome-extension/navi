@@ -52,14 +52,13 @@ WXT owns the manifest, generates `.wxt/` (typed globals, base tsconfig) on `wxt 
 
 ## The agent loop
 
-The heart of Navi is `runAgent` in [src/lib/agent.ts](../src/lib/agent.ts), driven by `App.send` in [src/app.tsx](../src/app.tsx). One send runs this loop up to `maxSteps` times:
+The heart of Navi is `runAgent` in [src/lib/agent/index.ts](../src/lib/agent/index.ts), driven by `App.send` in [src/app.tsx](../src/app.tsx). It uses native **tool calling**: the model is given real OpenAI tools (`click` / `fill` / `select` / `scroll`, derived from Zod schemas in [src/schemas/actions.ts](../src/schemas/actions.ts)) and either calls one or replies with a plain message. One send runs this loop up to `maxSteps` times:
 
 1. **Snapshot.** `App` captures the active tab (`capturePage`) into a `PageSnapshot` — a pruned, ref-stamped DOM tree — unless the user has detached the page. Each interactive element gets a numeric `ref` (mirrored to a live `data-navi-ref` attribute).
-2. **Ask the model.** `runAgent` sends the system prompt + prior history + a user message bundling the request, any attached elements, and the snapshot JSON to `chatComplete`.
-3. **Parse one action.** The model must reply with exactly one JSON object: `click` / `fill` / `select` / `scroll` (with a `ref`), or `done` (with the final answer). `parseAction` extracts it, tolerating code fences and falling back to a `done` answer if parsing fails.
-4. **`done` → finish.** The text is emitted via `onAnswer` and rendered as a markdown assistant message.
-5. **Otherwise execute.** The proposed action surfaces as a pending `AgentActionCard`. If `autoExecute` is off, `App` shows an inline approve/skip bar and awaits the user (`requestApproval`). On approval, `runAction` re-injects into the tab to perform it; the card updates to running → success/failed.
-6. **Observe & loop.** `App` re-captures the page and feeds the result + fresh snapshot back as an observation, then the loop repeats. Hitting `maxSteps` ends with a "reached the step limit" answer.
+2. **Ask the model.** `runAgent` streams a turn (`streamAgentTurn`) with the system prompt + prior history + a user message bundling the request, attached elements, and the snapshot JSON — passing the tool definitions. `reasoning` deltas stream into the thinking block; `content` deltas stream as the answer.
+3. **No tool call → finish.** If the model replied with text and no tool call, that text is the final answer (`onAnswer`), rendered as a markdown assistant message.
+4. **Otherwise execute.** Each tool call is validated (`parseToolCall`) and surfaces as a pending `AgentActionCard`. If `autoExecute` is off, `App` shows an inline approve/skip bar and awaits the user (`requestApproval`). On approval, `runAction` re-injects into the tab to perform it; the card updates to running → success/failed.
+5. **Observe & loop.** `App` re-captures the page once and feeds each tool's result back as a `tool`-role message (the fresh snapshot attached to the last), then the loop repeats. Hitting `maxSteps` ends with a "reached the step limit" answer.
 
 The whole run is cancellable: `App` holds an `AbortController` (Stop button / `handleStop`), passed into both the model request and the loop.
 

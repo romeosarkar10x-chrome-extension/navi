@@ -4,8 +4,10 @@ The non-UI core of Navi. These modules are framework-agnostic (no React) and hol
 
 ```
 providers.ts   ── config shape + presets + readiness
-chat-client.ts ── openai SDK wrapper (stream / complete / list / test)
-agent.ts       ── the read-act-observe loop + JSON action protocol
+chat-client.ts ── openai SDK wrapper (tool-call turn / stream / list / test)
+agent/         ── the read-act-observe loop + native tool-call protocol
+  index.ts     ──   runAgent loop + callbacks
+  tools.ts     ──   tool defs (from Zod) + tool-call parsing
 page-bridge.ts ── capture the DOM, run actions (injected into the tab)
 element-picker.ts ── devtools-style inspector to attach elements
 storage.ts     ── persist config + agent settings
@@ -41,55 +43,58 @@ interface ProviderPreset {
 
 ## `chat-client.ts` — the model client
 
-[src/lib/chat-client.ts](../src/lib/chat-client.ts) wraps the [`openai`](https://www.npmjs.com/package/openai) SDK. `ChatMessage` here is the **wire** shape (`{ role: "system"|"user"|"assistant", content: string }`), distinct from the UI's `ChatTurn`.
+[src/lib/chat-client.ts](../src/lib/chat-client.ts) wraps the [`openai`](https://www.npmjs.com/package/openai) SDK. `ChatMessage` here is the simple **wire** shape (`{ role: "system"|"user"|"assistant", content: string }`) used for chat history; the agent loop builds richer `ChatCompletionMessageParam`s internally (assistant messages carrying `tool_calls`, and `tool`-role results).
 
 `createClient(config)` builds an `OpenAI` instance with `baseURL`, `apiKey` (falls back to `"not-needed"` so the SDK's auth header is non-empty for keyless servers), and `dangerouslyAllowBrowser: true` (required to run in the panel's browser context).
 
-| Export                                           | Purpose                                                                                                                                        |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `streamChat(config, messages, onToken, signal?)` | Streaming completion — calls `onToken` per delta, resolves with the full text. (Not currently used by the agent loop, which is non-streaming.) |
-| `chatComplete(config, messages, signal?)`        | Non-streaming completion → full assistant text. Used by `runAgent`.                                                                            |
-| `listModels(config, signal?)`                    | `GET /models` → sorted model IDs. Powers `ConnectView`'s model dropdown. Throws on failure.                                                    |
-| `testConnection(config)`                         | Minimal `max_tokens: 1` request to validate endpoint/model/key. Throws on failure.                                                             |
+| Export                                                        | Purpose                                                                                                                                                                                                                  |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `streamAgentTurn(config, messages, tools, handlers, signal?)` | Streams one agent turn with tool calling. Surfaces `content` and `reasoning` deltas live via `handlers` (`onContent`/`onReasoning`), assembles streamed `tool_calls` by index, and resolves with `{ content, reasoning, toolCalls }`. **This is what `runAgent` uses.** |
+| `streamChat(config, messages, onToken, signal?)`              | Streaming text completion — calls `onToken` per delta, resolves with the full text. General-purpose; not used by the agent loop.                                                                                        |
+| `chatComplete(config, messages, signal?)`                     | Non-streaming completion → full assistant text. Not used by the agent loop.                                                                                                                                             |
+| `listModels(config, signal?)`                                 | `GET /models` → sorted model IDs. Powers `ConnectView`'s model dropdown. Throws on failure.                                                                                                                             |
+| `testConnection(config)`                                      | Minimal `max_tokens: 1` request to validate endpoint/model/key. Throws on failure.                                                                                                                                      |
 
-All accept an `AbortSignal` so the UI can cancel in-flight requests.
+`ToolCall` (`{ id, name, arguments }`) is the assembled-from-stream shape; `reasoning` comes from the non-standard `reasoning_content`/`reasoning` delta fields some endpoints emit (e.g. Qwen, DeepSeek) and feeds the UI's thinking block. All exports accept an `AbortSignal` so the UI can cancel in-flight requests.
 
-## <a id="agent"></a>`agent.ts` — the agent loop
+## <a id="agent"></a>`agent/` — the agent loop
 
-[src/lib/agent.ts](../src/lib/agent.ts) is the read-act-observe driver. It depends only on the lib layer and a set of callbacks/injected functions, so it has no React or DOM coupling.
+[src/lib/agent/index.ts](../src/lib/agent/index.ts) is the read-act-observe driver, with tool definitions and parsing split into [tools.ts](../src/lib/agent/tools.ts). It depends only on the lib layer and a set of callbacks/injected functions, so it has no React or DOM coupling.
 
 **Types:**
 
-- `ExecutableAction` — every `AgentAction` except `done` (i.e. `click` / `fill` / `select` / `scroll`).
+- `ExecutableAction` — every `AgentAction` except `done` (i.e. `click` / `fill` / `select` / `scroll`). The agent no longer produces a `done` action; finishing is just a turn with no tool call.
 - `ActionPhase` — `"pending" | "running" | "success" | "failed"` (drives the action card status).
-- `AgentCallbacks` — `onThought?`, `onAction(action, phase, result?)`, `onAnswer(text)`.
+- `AgentCallbacks` — the streaming surface: `onThoughtStart?`/`onThoughtToken?`/`onThought?` (the reasoning/thinking block), `onAction(action, phase, result?)`, and `onAnswerStart?`/`onAnswerToken?`/`onAnswer(text)` (the assistant's spoken text).
 - `RunAgentOptions` — config, `userText`, `snapshot`, `attachments`, `history`, callbacks, `maxSteps`, `autoExecute`, `requestApproval`, `runAction`, `recapture`, `signal`.
 
-**The protocol.** `SYSTEM_PROMPT` instructs the model to reply with exactly one JSON object per turn:
+**The protocol — native tool calls.** Rather than asking the model to emit a JSON action envelope, the loop sends real OpenAI **tools** and lets the model call them. The tools are derived from Zod schemas in [src/schemas/actions.ts](../src/schemas/actions.ts) (the single source of truth) via `z.toJSONSchema`:
 
-```jsonc
-{ "action": "click",  "ref": <n> }
-{ "action": "fill",   "ref": <n>, "value": "<text>" }
-{ "action": "select", "ref": <n>, "value": "<option text>" }
-{ "action": "scroll", "ref": <n optional> }      // omit ref → scroll the page
-{ "action": "done",   "text": "<answer to the user>" }
-```
+| Tool     | Parameters                | Effect                                                  |
+| -------- | ------------------------- | ------------------------------------------------------- |
+| `click`  | `{ ref }`                 | Click an interactive element.                           |
+| `fill`   | `{ ref, value }`          | Type into an input/textarea, replacing its value.       |
+| `select` | `{ ref, value }`          | Choose a `<select>` option by its visible text.         |
+| `scroll` | `{ ref? }`                | Scroll an element into view, or page down when no `ref`. |
 
-with an optional `"thought"` field. Read-only requests (summaries, "what can I click") are expected to answer with `done` on the first step.
+When the model has nothing to act on — chat, questions, summaries, "what can I click" — it simply replies with a normal message and **no** tool call; that text is the final answer.
 
-**Helpers:**
+**Helpers (in `tools.ts`):**
+
+- `AGENT_TOOLS` — the `ChatCompletionTool[]` built from `ACTION_PARAMS` (with `$schema` stripped, since some endpoints reject unknown top-level keys).
+- `parseToolCall(name, rawArgs)` — validate a tool call's name + raw JSON arguments against the Zod schema; returns either `{ action }` (a typed `ExecutableAction`) or `{ error }` (a message fed back to the model as the tool result).
+
+**Helpers (in `index.ts`):**
 
 - `snapshotToText(snapshot)` — serialize a `PageSnapshot` to the compact JSON handed to the model (`(no page access …)` when null).
-- `parseAction(raw)` — pull the first balanced top-level JSON object (handling ` ```json ` fences), parse it into a typed `AgentAction`, and fall back to a `done` answer carrying the raw text if there's no valid JSON.
 
 **`runAgent(opts)`** — seeds `[system, ...history, user]` (the user message bundles request + attachments + snapshot via `buildUserMessage`), then loops up to `maxSteps`:
 
-1. `chatComplete` → on error (and not aborted) emit a `⚠️` answer and stop.
-2. `parseAction`; emit `onThought` if present.
-3. `done` → `onAnswer`, return.
-4. Otherwise `onAction(action, "pending")`. If `!autoExecute`, await `requestApproval`; a skip emits a `failed` card and feeds "user skipped that action" back to the model.
-5. `onAction(…, "running")` → `runAction` → `onAction(…, "success"|"failed", result)`.
-6. `recapture()` and push an `observation(result, snapshot)` user message; loop.
+1. `streamAgentTurn(config, messages, AGENT_TOOLS, …)` → on error (and not aborted) emit a `⚠️` answer and stop. `reasoning` deltas stream to the thinking block; `content` deltas stream to the answer.
+2. Push the assistant turn onto `messages` (its `content` plus any `tool_calls`).
+3. **No tool calls** → `onAnswer(content)`, return. (Any `content` streamed alongside tool calls is finalized as a preamble.)
+4. Otherwise, for each tool call: `parseToolCall`; `onAction(action, "pending")`. If `!autoExecute`, await `requestApproval`; a skip emits a `failed` card and queues a "user skipped this action" tool result. Otherwise `onAction(…, "running")` → `runAction` → `onAction(…, "success"|"failed", result)`.
+5. `recapture()` **once** after the batch, then push one `tool`-role message per call (keyed by `tool_call_id`); the fresh snapshot is appended only to the last result to save tokens. Loop.
 
 Exhausting `maxSteps` emits a "reached the step limit" answer. Every iteration checks `signal.aborted` and bails.
 
